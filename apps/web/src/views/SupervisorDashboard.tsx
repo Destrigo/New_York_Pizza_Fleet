@@ -21,6 +21,7 @@ export default function SupervisorDashboard() {
   const [rankPeriod, setRankPeriod] = useState<RankPeriod>('month')
   const [drillLoc, setDrillLoc] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<FaultStatus | 'all'>('all')
+  const [search, setSearch] = useState('')
 
   const { faults: allFaults, loading: fLoading } = useFaults()
   const { vehicles: allVehicles, loading: vLoading } = useVehicles()
@@ -77,9 +78,17 @@ export default function SupervisorDashboard() {
     fault: allVehicles.filter((v) => v.type === t && (v.status === 'fault' || v.status === 'fix')).length,
   }))
 
-  const filteredFaults = filterStatus === 'all'
-    ? allFaults
-    : allFaults.filter((f) => f.status === filterStatus)
+  const filteredFaults = allFaults.filter((f) => {
+    if (filterStatus !== 'all' && f.status !== filterStatus) return false
+    if (search) {
+      const q = search.toLowerCase()
+      const locName = MOCK_MODE ? (MOCK_LOC_MAP[f.location_id]?.name ?? '') : (f.location?.name ?? '')
+      if (!f.vehicle_id.toLowerCase().includes(q) &&
+          !f.fault_type.toLowerCase().includes(q) &&
+          !locName.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
 
   const drillFaults   = drillLoc ? allFaults.filter((f) => f.location_id === drillLoc) : []
   const drillVehicles = drillLoc ? allVehicles.filter((v) => v.location_id === drillLoc) : []
@@ -165,7 +174,14 @@ export default function SupervisorDashboard() {
       {/* ── FAULTS ── */}
       {tab === 'faults' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              className="inp"
+              placeholder="Zoek op voertuig, type, locatie…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ maxWidth: 240, height: 32 }}
+            />
             {(['all', 'open', 'in_progress', 'ready', 'closed'] as const).map((s) => (
               <button
                 key={s}
