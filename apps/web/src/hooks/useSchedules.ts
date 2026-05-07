@@ -55,9 +55,18 @@ export function useSchedules(opts: Options = {}) {
   }, [load])
 
   const complete = async (id: string) => {
+    const schedule = schedules.find((s) => s.id === id)
     setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'completed' } : s))
-    if (!MOCK_MODE) {
+    if (!MOCK_MODE && schedule) {
       await supabase!.from('pickup_schedules').update({ status: 'completed' }).eq('id', id)
+      await supabase!.from('vehicle_log').insert({
+        vehicle_id: schedule.vehicle_id,
+        event_type: 'moved',
+        from_location_id: schedule.from_location_id,
+        to_location_id: schedule.to_location_id,
+        performed_by: schedule.driver_id,
+        notes: `Rit voltooid door chauffeur`,
+      })
     }
   }
 

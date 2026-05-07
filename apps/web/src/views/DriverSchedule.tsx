@@ -76,7 +76,7 @@ export default function DriverSchedule() {
                   </div>
                   <div style={{ fontSize: 13, marginBottom: 4 }}>
                     <strong>{s.vehicle_id}</strong>
-                    {s.vehicle_id === s.from_location_id ? ' — Ophalen' : ' — Afleveren'}
+                    {from?.name?.includes('Hub') ? ' — Afleveren' : ' — Ophalen'}
                   </div>
                   {s.notes && (
                     <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>

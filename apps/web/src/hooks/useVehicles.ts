@@ -53,11 +53,10 @@ export function useVehicles(opts: Options = {}) {
 
   const assign = async (vehicleId: string, targetLocationId: string, performedBy: string) => {
     if (MOCK_MODE) {
-      setVehicles((prev) =>
-        prev.filter((v) => v.id !== vehicleId)
-      )
+      setVehicles((prev) => prev.filter((v) => v.id !== vehicleId))
       return { error: null }
     }
+    const currentVehicle = vehicles.find((v) => v.id === vehicleId)
     const { error } = await supabase!
       .from('vehicles')
       .update({ location_id: targetLocationId, status: 'ok' })
@@ -67,6 +66,7 @@ export function useVehicles(opts: Options = {}) {
       await supabase!.from('vehicle_log').insert({
         vehicle_id: vehicleId,
         event_type: 'assigned',
+        from_location_id: currentVehicle?.location_id ?? null,
         to_location_id: targetLocationId,
         performed_by: performedBy,
         notes: `Toegewezen aan ${targetLocationId}`,
