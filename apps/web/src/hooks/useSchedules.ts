@@ -6,6 +6,8 @@ import { MOCK_SCHEDULES } from '@/lib/mock'
 interface Options {
   driverId?: string
   date?: string
+  fromLocationId?: string
+  status?: PickupSchedule['status'][]
 }
 
 const SELECT_FIELDS = '*, driver:users(full_name), vehicle:vehicles(*), from_location:locations!from_location_id(*), to_location:locations!to_location_id(*)'
@@ -17,8 +19,10 @@ export function useSchedules(opts: Options = {}) {
   useEffect(() => {
     if (MOCK_MODE) {
       let data = [...MOCK_SCHEDULES]
-      if (opts.driverId) data = data.filter((s) => s.driver_id === opts.driverId)
-      if (opts.date)     data = data.filter((s) => s.scheduled_date === opts.date)
+      if (opts.driverId)        data = data.filter((s) => s.driver_id === opts.driverId)
+      if (opts.date)            data = data.filter((s) => s.scheduled_date === opts.date)
+      if (opts.fromLocationId)  data = data.filter((s) => s.from_location_id === opts.fromLocationId)
+      if (opts.status)          data = data.filter((s) => opts.status!.includes(s.status))
       data.sort((a, b) => a.time_from.localeCompare(b.time_from))
       setSchedules(data)
       setLoading(false)
@@ -28,13 +32,15 @@ export function useSchedules(opts: Options = {}) {
     let q = supabase!
       .from('pickup_schedules')
       .select(SELECT_FIELDS)
-      .order('time_from')
+      .order('scheduled_date', { ascending: false })
 
-    if (opts.driverId) q = q.eq('driver_id', opts.driverId)
-    if (opts.date)     q = q.eq('scheduled_date', opts.date)
+    if (opts.driverId)       q = q.eq('driver_id', opts.driverId)
+    if (opts.date)           q = q.eq('scheduled_date', opts.date)
+    if (opts.fromLocationId) q = q.eq('from_location_id', opts.fromLocationId)
+    if (opts.status?.length) q = q.in('status', opts.status)
 
     q.then(({ data }) => { setSchedules(data ?? []); setLoading(false) })
-  }, [opts.driverId, opts.date])
+  }, [opts.driverId, opts.date, opts.fromLocationId, JSON.stringify(opts.status)])
 
   const complete = async (id: string) => {
     setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'completed' } : s))

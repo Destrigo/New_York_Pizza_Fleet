@@ -22,7 +22,10 @@ export default function HubDashboard() {
   const inProgress = activeFaults.filter((f) => f.status === 'in_progress').length
   const ready      = activeFaults.filter((f) => f.status === 'ready').length
 
-  const todaySchedule = schedules.filter((s) => s.status === 'planned').slice(0, 4)
+  const todayStr      = new Date().toISOString().split('T')[0]
+  const todaySchedule = schedules
+    .filter((s) => s.scheduled_date === todayStr && s.status === 'planned')
+    .slice(0, 4)
 
   const getVehicleIcon = (f: Fault) =>
     vehicleTypeIcon[MOCK_MODE ? (MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)?.type ?? '') : (f.vehicle?.type ?? '')]

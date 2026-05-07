@@ -7,6 +7,7 @@ import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useSchedules } from '@/hooks/useSchedules'
 import { useRanking } from '@/hooks/useRanking'
 
 export default function ManagerDashboard() {
@@ -16,6 +17,7 @@ export default function ManagerDashboard() {
 
   const { faults: myFaults, loading: fLoading } = useFaults({ locationId: user?.location_id })
   const { vehicles: myVehicles, loading: vLoading } = useVehicles({ locationId: user?.location_id })
+  const { schedules: hubVisits } = useSchedules({ fromLocationId: user?.location_id, status: ['completed'] })
   const { byFaults, byQuality } = useRanking()
 
   if (!user) return null
@@ -72,14 +74,33 @@ export default function ManagerDashboard() {
             </div>
           </div>
 
-          <div className="htf-card" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div className="lbl">Laatste Hub bezoek</div>
-              <div style={{ fontFamily: "'Playfair Display'", fontSize: 18, fontWeight: 700 }}>24 april 2026</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>F-024 afgeleverd · F-001 opgehaald</div>
-            </div>
-            <div style={{ fontSize: 36 }}>🚐</div>
-          </div>
+          {(() => {
+            const last = hubVisits[0]
+            const lastFromName = last
+              ? (MOCK_MODE ? MOCK_LOC_MAP[last.to_location_id]?.name : last.to_location?.name) ?? 'Hub'
+              : null
+            return (
+              <div className="htf-card" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div className="lbl">Laatste Hub bezoek</div>
+                  {last ? (
+                    <>
+                      <div style={{ fontFamily: "'Playfair Display'", fontSize: 18, fontWeight: 700 }}>
+                        {last.scheduled_date}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        {last.vehicle_id} → {lastFromName}
+                        {last.notes ? ` · ${last.notes}` : ''}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 14, color: 'var(--muted)' }}>Geen Hub bezoeken gevonden</div>
+                  )}
+                </div>
+                <div style={{ fontSize: 36 }}>🚐</div>
+              </div>
+            )
+          })()}
 
           <div className="htf-sh">
             <h2>Recente storingen</h2>
