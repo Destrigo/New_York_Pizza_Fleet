@@ -14,7 +14,7 @@ import type { PickupSchedule } from '@/types'
 export default function HubSchedule() {
   const { user } = useAuth()
   const toast = useToast()
-  const { schedules, loading, cancel, create } = useSchedules({})
+  const { schedules, loading, cancel, create, complete } = useSchedules({})
   const { users: drivers } = useUsers({ role: 'driver' })
   const { locations: allLocations } = useLocations({})
   const { faults: openFaults } = useFaults({ status: ['open', 'in_progress', 'ready'] })
@@ -76,6 +76,12 @@ export default function HubSchedule() {
     if (!confirm('Weet je zeker dat je dit ophaalmoment wilt annuleren?')) return
     await cancel(id)
     toast('Ophaalmoment geannuleerd.')
+  }
+
+  const handleComplete = async (id: string) => {
+    if (!confirm('Dit ophaalmoment markeren als voltooid?')) return
+    await complete(id)
+    toast('Ophaalmoment voltooid.')
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -209,7 +215,10 @@ export default function HubSchedule() {
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 {s.status === 'planned' && (
-                  <button className="btn btn-muted btn-sm" onClick={() => handleCancel(s.id)}>Annuleren</button>
+                  <>
+                    <button className="btn btn-green btn-sm" onClick={() => handleComplete(s.id)}>✓ Voltooid</button>
+                    <button className="btn btn-muted btn-sm" onClick={() => handleCancel(s.id)}>Annuleren</button>
+                  </>
                 )}
                 <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
                   {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}

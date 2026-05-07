@@ -284,12 +284,29 @@ export default function SupervisorDashboard() {
       {/* ── RANKING ── */}
       {tab === 'ranking' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             {(['month', 'prev', 'ytd'] as const).map((p) => (
               <button key={p} className={`btn btn-sm ${rankPeriod === p ? 'btn-red' : 'btn-muted'}`} onClick={() => setRankPeriod(p)}>
                 {p === 'month' ? 'Deze maand' : p === 'prev' ? 'Vorige maand' : 'Jaar tot nu'}
               </button>
             ))}
+            {rankEntries.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => exportCsv(
+                  rankByFaults.map((r, i) => ({
+                    rank: i + 1,
+                    locatie: r.location_name,
+                    storingen: r.fault_count,
+                    kwaliteit: r.quality_avg.toFixed(1),
+                  })),
+                  `ranking-${rankPeriod}-${new Date().toISOString().split('T')[0]}.csv`
+                )}
+              >
+                ↓ CSV
+              </button>
+            )}
           </div>
 
           <div className="grid-2">
