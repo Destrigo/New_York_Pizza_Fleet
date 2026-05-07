@@ -2,17 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { roleLabel } from '@/lib/utils'
-import { MOCK_MODE } from '@/lib/supabase'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 
 export default function Profile() {
   const { user } = useAuth()
   const toast = useToast()
 
-  const [name, setName]         = useState(user?.full_name ?? '')
-  const [oldPw, setOldPw]       = useState('')
-  const [newPw, setNewPw]       = useState('')
-  const [saving, setSaving]     = useState(false)
+  const [name, setName]     = useState(user?.full_name ?? '')
+  const [newPw, setNewPw]   = useState('')
+  const [saving, setSaving] = useState(false)
 
   if (!user) return null
 
@@ -20,10 +19,23 @@ export default function Profile() {
 
   const saveProfile = async () => {
     setSaving(true)
-    // In real mode: update users table + supabase auth password if newPw set
-    await new Promise((r) => setTimeout(r, 600))
+    try {
+      if (MOCK_MODE) {
+        await new Promise((r) => setTimeout(r, 500))
+        toast('Profiel opgeslagen (demo).')
+        setSaving(false)
+        return
+      }
+      await supabase!.from('users').update({ full_name: name }).eq('id', user.id)
+      if (newPw.length >= 6) {
+        await supabase!.auth.updateUser({ password: newPw })
+      }
+      setNewPw('')
+      toast('Profiel opgeslagen.')
+    } catch {
+      toast('Opslaan mislukt.', 'error')
+    }
     setSaving(false)
-    toast('Profiel opgeslagen.')
   }
 
   return (
@@ -51,24 +63,23 @@ export default function Profile() {
           </div>
 
           {!MOCK_MODE && (
-            <>
-              <div className="field">
-                <label className="lbl">Huidig wachtwoord</label>
-                <input className="inp" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="lbl">Nieuw wachtwoord</label>
-                <input className="inp" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
-              </div>
-            </>
+            <div className="field">
+              <label className="lbl">Nieuw wachtwoord <span style={{ color: 'var(--muted)' }}>(optioneel · min. 6 tekens)</span></label>
+              <input className="inp" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Laat leeg om niet te wijzigen" />
+            </div>
           )}
 
-          <button className="btn btn-red" onClick={saveProfile} disabled={saving || MOCK_MODE}>
+          <button
+            className="btn btn-red"
+            onClick={saveProfile}
+            disabled={saving || (!name.trim())}
+            style={{ marginTop: 4 }}
+          >
             {saving ? 'Opslaan…' : 'Opslaan'}
           </button>
           {MOCK_MODE && (
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-              Profiel bewerken werkt alleen met Supabase verbinding.
+              Naam-wijzigingen worden opgeslagen zodra Supabase is verbonden.
             </div>
           )}
         </div>
@@ -87,6 +98,9 @@ export default function Profile() {
               <input type="checkbox" defaultChecked style={{ accentColor: 'var(--red)', width: 18, height: 18 }} />
             </div>
           ))}
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
+            Instellingen worden opgeslagen per sessie.
+          </div>
         </div>
       </div>
     </div>

@@ -64,16 +64,21 @@ async function notify(payload: NotificationPayload) {
     sent_at: new Date().toISOString(),
   })
 
-  // Get recipient's fcm_token and email
+  // Get recipient's fcm_token, last_seen and email
   const { data: user } = await supabase
     .from('users')
-    .select('fcm_token')
+    .select('fcm_token, last_seen')
     .eq('id', payload.recipient_id)
     .single()
 
   const { data: authUser } = await supabase.auth.admin.getUserById(payload.recipient_id)
 
-  if (user?.fcm_token) {
+  // Skip FCM push if user has the app open (last_seen within 2 minutes)
+  const isOnline = user?.last_seen
+    ? (Date.now() - new Date(user.last_seen).getTime()) < 2 * 60 * 1000
+    : false
+
+  if (user?.fcm_token && !isOnline) {
     await sendFCM(user.fcm_token, payload.title, payload.body)
   }
 

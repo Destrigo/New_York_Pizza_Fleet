@@ -26,6 +26,7 @@ export interface User {
   location_id: string
   avatar_url: string | null
   fcm_token: string | null
+  last_seen?: string | null
   created_at: string
   // joined
   location?: Location

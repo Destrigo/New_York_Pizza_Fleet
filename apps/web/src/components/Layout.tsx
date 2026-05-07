@@ -1,11 +1,14 @@
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { usePresence } from '@/hooks/usePresence'
 import Nav from './Nav'
+import MobileNav from './MobileNav'
 
 export default function Layout() {
   const { user, loading } = useAuth()
   usePushNotifications(user?.id)
+  usePresence(user?.id)
 
   if (loading) {
     return (
@@ -29,6 +32,7 @@ export default function Layout() {
         <div className="htf-footer-brand">Hi Tom Fleet</div>
         <div className="htf-footer-sub">Amsterdam & Enschede · 2026</div>
       </footer>
+      <MobileNav />
     </div>
   )
 }

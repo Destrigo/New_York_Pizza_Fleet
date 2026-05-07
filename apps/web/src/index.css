@@ -298,10 +298,15 @@ html, body, #root {
   text-align: center; padding: 6px 12px;
 }
 
+/* ── MOBILE NAV ─────────────────────────────────────────── */
+.htf-mobile-nav { display: none; }
+
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 700px) {
   .htf-page { padding: 16px; }
   .htf-nav { padding: 0 16px; }
   .htf-stats { grid-template-columns: 1fr 1fr; }
   .tab { padding: 10px 12px; font-size: 11px; }
+  .htf-mobile-nav { display: flex; }
+  .htf-shell { padding-bottom: 70px; }
 }
