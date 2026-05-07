@@ -2,30 +2,44 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useToast } from '@/components/Toast'
 import { fmtDateTime, vehicleTypeIcon, faultStatusLabel } from '@/lib/utils'
-import { MOCK_FAULTS, MOCK_VEHICLES, MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_VEHICLES, MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_MODE } from '@/lib/supabase'
+import { useFaults } from '@/hooks/useFaults'
 import type { Fault, FaultStatus } from '@/types'
 
 const STATUS_COLS: FaultStatus[] = ['open', 'in_progress', 'ready']
 
+const colColor: Record<FaultStatus, string> = {
+  open: 'var(--red)', in_progress: 'var(--gold)', ready: 'var(--green)', closed: 'var(--muted)',
+}
+
 export default function HubQueue() {
   const toast = useToast()
-  const [faults, setFaults] = useState(MOCK_FAULTS.filter((f) => f.status !== 'closed'))
+  const { faults, loading, updateStatus } = useFaults({ status: ['open', 'in_progress', 'ready'] })
   const [filterType, setFilterType] = useState<string>('all')
 
+  const getVehicle = (f: Fault) =>
+    MOCK_MODE ? MOCK_VEHICLES.find((v) => v.id === f.vehicle_id) : f.vehicle
+
+  const getLoc = (f: Fault) =>
+    MOCK_MODE ? MOCK_LOC_MAP[f.location_id] : f.location
+
+  const filtered = filterType === 'all'
+    ? faults
+    : faults.filter((f) => getVehicle(f)?.type === filterType)
+
   const grouped = STATUS_COLS.reduce((acc, s) => {
-    acc[s] = faults.filter((f) => f.status === s && (filterType === 'all' || MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)?.type === filterType))
+    acc[s] = filtered.filter((f) => f.status === s)
     return acc
   }, {} as Record<FaultStatus, Fault[]>)
 
   const advance = (fault: Fault) => {
     const next: FaultStatus = fault.status === 'open' ? 'in_progress' : fault.status === 'in_progress' ? 'ready' : 'closed'
-    setFaults((prev) => prev.map((f) => f.id === fault.id ? { ...f, status: next } : f).filter((f) => f.status !== 'closed'))
+    updateStatus(fault.id, next)
     toast(`${fault.vehicle_id} → ${faultStatusLabel[next]}`)
   }
 
-  const colColor: Record<FaultStatus, string> = {
-    open: 'var(--red)', in_progress: 'var(--gold)', ready: 'var(--green)', closed: 'var(--muted)',
-  }
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
@@ -59,8 +73,8 @@ export default function HubQueue() {
                   Leeg
                 </div>
               ) : grouped[status].map((f) => {
-                const vehicle = MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)
-                const loc     = MOCK_LOC_MAP[f.location_id]
+                const vehicle = getVehicle(f)
+                const loc     = getLoc(f)
                 const canAdv  = f.status !== 'ready'
                 return (
                   <div key={f.id} className="htf-card" style={{ padding: 14, borderTopColor: colColor[status] }}>
@@ -80,7 +94,11 @@ export default function HubQueue() {
                         💬 Detail
                       </Link>
                       {canAdv && (
-                        <button className="btn btn-sm" style={{ flex: 1, background: colColor[f.status === 'open' ? 'in_progress' : 'ready'], color: '#fff' }} onClick={() => advance(f)}>
+                        <button
+                          className="btn btn-sm"
+                          style={{ flex: 1, background: colColor[f.status === 'open' ? 'in_progress' : 'ready'], color: '#fff' }}
+                          onClick={() => advance(f)}
+                        >
                           {f.status === 'open' ? '▶ Start Fix' : '✓ Klaar'}
                         </button>
                       )}

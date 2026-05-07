@@ -1,28 +1,23 @@
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useToast } from '@/components/Toast'
 import { fmtDate } from '@/lib/utils'
-import { MOCK_SCHEDULES, MOCK_LOC_MAP } from '@/lib/mock'
-import type { PickupSchedule } from '@/types'
+import { MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_MODE } from '@/lib/supabase'
+import { useSchedules } from '@/hooks/useSchedules'
 
 export default function DriverSchedule() {
   const { user } = useAuth()
-  const toast = useToast()
-
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate] = useState(today)
-  const [schedules, setSchedules] = useState<PickupSchedule[]>(MOCK_SCHEDULES)
+
+  const { schedules, loading, complete } = useSchedules({ driverId: user?.id, date })
 
   if (!user) return null
 
-  const myItems = schedules
-    .filter((s) => s.driver_id === user.id && s.scheduled_date === date && s.status !== 'cancelled')
-    .sort((a, b) => a.time_from.localeCompare(b.time_from))
+  const myItems = schedules.filter((s) => s.status !== 'cancelled')
 
-  const complete = (id: string) => {
-    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'completed' } : s))
-    toast('Rit gemarkeerd als voltooid.')
-  }
+  const getLoc = (locId: string, joined?: { name: string } | null) =>
+    MOCK_MODE ? MOCK_LOC_MAP[locId] : joined
 
   return (
     <div>
@@ -43,7 +38,9 @@ export default function DriverSchedule() {
         </span>
       </div>
 
-      {myItems.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+      ) : myItems.length === 0 ? (
         <div className="htf-card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚐</div>
           <div style={{ fontSize: 16, fontFamily: "'Playfair Display'", fontWeight: 700, marginBottom: 8 }}>
@@ -59,8 +56,8 @@ export default function DriverSchedule() {
             {myItems.length} rit{myItems.length !== 1 ? 'ten' : ''} vandaag
           </div>
           {myItems.map((s, idx) => {
-            const from = MOCK_LOC_MAP[s.from_location_id]
-            const to   = MOCK_LOC_MAP[s.to_location_id]
+            const from = getLoc(s.from_location_id, s.from_location)
+            const to   = getLoc(s.to_location_id, s.to_location)
             const done = s.status === 'completed'
             return (
               <div key={s.id} className="sched-item" style={{

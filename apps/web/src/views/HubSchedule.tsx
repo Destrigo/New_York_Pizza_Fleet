@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { fmtDate } from '@/lib/utils'
-import { MOCK_SCHEDULES, MOCK_USERS, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
+import { MOCK_USERS, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
+import { MOCK_MODE } from '@/lib/supabase'
+import { useSchedules } from '@/hooks/useSchedules'
 import type { PickupSchedule } from '@/types'
 
 const DRIVERS = MOCK_USERS.filter((u) => u.role === 'driver')
 
 export default function HubSchedule() {
+  const { user } = useAuth()
   const toast = useToast()
-  const [schedules, setSchedules] = useState<PickupSchedule[]>(MOCK_SCHEDULES)
+  const { schedules, loading, cancel, create } = useSchedules({})
   const [showForm, setShowForm]   = useState(false)
   const [filterDriver, setFilterDriver] = useState<string>('all')
 
@@ -16,6 +20,8 @@ export default function HubSchedule() {
     fault_id: '', driver_id: '', from_location_id: '', to_location_id: '',
     scheduled_date: '', time_from: '', time_to: '', vehicle_id: '', notes: '',
   })
+
+  if (!user) return null
 
   const filtered = filterDriver === 'all'
     ? schedules
@@ -28,24 +34,43 @@ export default function HubSchedule() {
     return acc
   }, {} as Record<string, PickupSchedule[]>)
 
-  const submitSchedule = () => {
-    const newS: PickupSchedule = {
-      id: Date.now().toString(),
-      ...form,
-      status: 'planned',
-      assigned_by: 'karim',
-      created_at: new Date().toISOString(),
+  const getDriverName = (s: PickupSchedule) =>
+    MOCK_MODE ? MOCK_USERS_MAP[s.driver_id]?.full_name : s.driver?.full_name
+
+  const getFromName = (s: PickupSchedule) =>
+    MOCK_MODE ? MOCK_LOC_MAP[s.from_location_id]?.name : s.from_location?.name
+
+  const getToName = (s: PickupSchedule) =>
+    MOCK_MODE ? MOCK_LOC_MAP[s.to_location_id]?.name : s.to_location?.name
+
+  const submitSchedule = async () => {
+    const { error } = await create({
+      fault_id: form.fault_id || '',
+      driver_id: form.driver_id,
+      assigned_by: user.id,
+      from_location_id: form.from_location_id,
+      to_location_id: form.to_location_id,
+      scheduled_date: form.scheduled_date,
+      time_from: form.time_from,
+      time_to: form.time_to,
+      vehicle_id: form.vehicle_id,
+      notes: form.notes || null,
+    })
+    if (error) {
+      toast('Aanmaken mislukt.', 'error')
+      return
     }
-    setSchedules((prev) => [...prev, newS])
     setShowForm(false)
     setForm({ fault_id: '', driver_id: '', from_location_id: '', to_location_id: '', scheduled_date: '', time_from: '', time_to: '', vehicle_id: '', notes: '' })
     toast('Ophaalmoment aangemaakt. Chauffeur en locatiebeheerder ontvangen een notificatie.')
   }
 
-  const cancel = (id: string) => {
-    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'cancelled' } : s))
+  const handleCancel = async (id: string) => {
+    await cancel(id)
     toast('Ophaalmoment geannuleerd.')
   }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
@@ -126,29 +151,24 @@ export default function HubSchedule() {
             <h2>{fmtDate(date)}</h2>
             <div className="htf-rule" />
           </div>
-          {items.map((s) => {
-            const driver = MOCK_USERS_MAP[s.driver_id]
-            const from   = MOCK_LOC_MAP[s.from_location_id]
-            const to     = MOCK_LOC_MAP[s.to_location_id]
-            return (
-              <div key={s.id} className="sched-item" style={{ borderLeftColor: s.status === 'cancelled' ? 'var(--muted)' : s.status === 'completed' ? 'var(--green)' : 'var(--gold)', opacity: s.status === 'cancelled' ? 0.6 : 1 }}>
-                <div className="sched-time">{s.time_from}<br />{s.time_to}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{s.vehicle_id} · {driver?.full_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{from?.name} → {to?.name}</div>
-                  {s.notes && <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 4, fontStyle: 'italic' }}>{s.notes}</div>}
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  {s.status === 'planned' && (
-                    <button className="btn btn-muted btn-sm" onClick={() => cancel(s.id)}>Annuleren</button>
-                  )}
-                  <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
-                    {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}
-                  </span>
-                </div>
+          {items.map((s) => (
+            <div key={s.id} className="sched-item" style={{ borderLeftColor: s.status === 'cancelled' ? 'var(--muted)' : s.status === 'completed' ? 'var(--green)' : 'var(--gold)', opacity: s.status === 'cancelled' ? 0.6 : 1 }}>
+              <div className="sched-time">{s.time_from}<br />{s.time_to}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{s.vehicle_id} · {getDriverName(s)}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{getFromName(s)} → {getToName(s)}</div>
+                {s.notes && <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 4, fontStyle: 'italic' }}>{s.notes}</div>}
               </div>
-            )
-          })}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {s.status === 'planned' && (
+                  <button className="btn btn-muted btn-sm" onClick={() => handleCancel(s.id)}>Annuleren</button>
+                )}
+                <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
+                  {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       ))}
 

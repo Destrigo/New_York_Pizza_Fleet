@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
+import { useVehicles } from '@/hooks/useVehicles'
+import { useFaults } from '@/hooks/useFaults'
 import { vehicleTypeLabel, vehicleTypeIcon, computeQualityScore } from '@/lib/utils'
-import { MOCK_VEHICLES, MOCK_LOC_MAP } from '@/lib/mock'
-import { MOCK_MODE } from '@/lib/supabase'
-import { supabase } from '@/lib/supabase'
-import type { Vehicle } from '@/types'
+import { MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
+import { compressAll } from '@/lib/compress'
 
 const FAULT_OPTS: Record<string, string[]> = {
   ebike:   ['Elektrische aandrijving', 'Pizza Box houder', 'Lekke band', 'Spaken', 'Sleutel kwijt', 'Overig'],
@@ -20,20 +21,23 @@ const MAX_PHOTOS = 8
 export default function FaultForm() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const toast = useToast()
+  const toast    = useToast()
 
-  const [vehicles, setVehicles]     = useState<Vehicle[]>([])
-  const [vehicleId, setVehicleId]   = useState('')
-  const [faultType, setFaultType]   = useState('')
-  const [notes, setNotes]           = useState('')
-  const [photos, setPhotos]         = useState<File[]>([])
-  const [previews, setPreviews]     = useState<string[]>([])
-  const [uploading, setUploading]   = useState(false)
-  const [submitted, setSubmitted]   = useState(false)
-  const [_step, setStep]             = useState(1)
+  const { vehicles } = useVehicles({ locationId: user?.location_id, excludeStatus: ['hub'] })
+  const { faults: activeFaults } = useFaults({ locationId: user?.location_id, status: ['open', 'in_progress'] })
 
+  const [vehicleId, setVehicleId] = useState('')
+  const [faultType, setFaultType] = useState('')
+  const [notes, setNotes]         = useState('')
+  const [photos, setPhotos]       = useState<File[]>([])
+  const [previews, setPreviews]   = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress]   = useState(0)
+  const [submitted, setSubmitted] = useState(false)
+  const [warnDuplicate, setWarnDuplicate] = useState(false)
+
+  // Restore draft from sessionStorage
   useEffect(() => {
-    // Restore draft from sessionStorage
     const draft = sessionStorage.getItem('htf_fault_draft')
     if (draft) {
       const d = JSON.parse(draft)
@@ -43,98 +47,84 @@ export default function FaultForm() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!user) return
-    if (MOCK_MODE) {
-      setVehicles(MOCK_VEHICLES.filter((v) => v.location_id === user.location_id && v.status !== 'hub'))
-    } else {
-      supabase!
-        .from('vehicles')
-        .select('*')
-        .eq('location_id', user.location_id)
-        .neq('status', 'hub')
-        .then(({ data }) => setVehicles(data ?? []))
-    }
-  }, [user])
-
   // Persist draft
   useEffect(() => {
     sessionStorage.setItem('htf_fault_draft', JSON.stringify({ vehicleId, faultType, notes }))
   }, [vehicleId, faultType, notes])
 
+  // Check for duplicate active fault on the selected vehicle
+  useEffect(() => {
+    if (!vehicleId) { setWarnDuplicate(false); return }
+    setWarnDuplicate(activeFaults.some((f) => f.vehicle_id === vehicleId))
+  }, [vehicleId, activeFaults])
+
   if (!user) return null
 
-  const loc = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
+  const loc      = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
   const selected = vehicles.find((v) => v.id === vehicleId)
-  const opts = selected ? (FAULT_OPTS[selected.type] ?? []) : []
+  const opts     = selected ? (FAULT_OPTS[selected.type] ?? []) : []
 
-  const handlePhotoAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    const remaining = MAX_PHOTOS - photos.length
-    const toAdd = files.slice(0, remaining)
-    setPhotos((prev) => [...prev, ...toAdd])
-    const urls = toAdd.map((f) => URL.createObjectURL(f))
+  const handlePhotoAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw   = Array.from(e.target.files ?? [])
+    const room  = MAX_PHOTOS - photos.length
+    const slice = raw.slice(0, room)
+    const compressed = await compressAll(slice)
+    setPhotos((prev) => [...prev, ...compressed])
+    const urls = compressed.map((f) => URL.createObjectURL(f))
     setPreviews((prev) => [...prev, ...urls])
+    e.target.value = ''
   }
 
   const removePhoto = (i: number) => {
     setPhotos((prev) => prev.filter((_, idx) => idx !== i))
-    setPreviews((prev) => {
-      URL.revokeObjectURL(prev[i])
-      return prev.filter((_, idx) => idx !== i)
-    })
+    setPreviews((prev) => { URL.revokeObjectURL(prev[i]); return prev.filter((_, idx) => idx !== i) })
   }
 
   const handleSubmit = async () => {
     if (!vehicleId || !faultType || photos.length < 2) return
     setUploading(true)
+    setProgress(0)
 
     try {
       if (MOCK_MODE) {
-        await new Promise((r) => setTimeout(r, 800))
+        for (let i = 0; i <= photos.length; i++) {
+          await new Promise((r) => setTimeout(r, 200))
+          setProgress(Math.round((i / photos.length) * 100))
+        }
         sessionStorage.removeItem('htf_fault_draft')
         setSubmitted(true)
         setUploading(false)
         return
       }
 
-      // Real submission
+      // Insert fault row
       const { data: fault, error: faultErr } = await supabase!
         .from('faults')
-        .insert({
-          vehicle_id: vehicleId,
-          location_id: user.location_id,
-          reported_by: user.id,
-          fault_type: faultType,
-          notes: notes || null,
-        })
+        .insert({ vehicle_id: vehicleId, location_id: user.location_id, reported_by: user.id, fault_type: faultType, notes: notes || null })
         .select()
         .single()
 
-      if (faultErr || !fault) throw faultErr ?? new Error('Fault insert failed')
+      if (faultErr || !fault) throw faultErr ?? new Error('Insert failed')
 
-      // Upload photos
-      for (const file of photos) {
+      // Upload photos with progress
+      for (let i = 0; i < photos.length; i++) {
+        const file = photos[i]
         const path = `${fault.id}/${Date.now()}_${file.name}`
         await supabase!.storage.from('fault-photos').upload(path, file, { contentType: file.type })
         await supabase!.from('fault_photos').insert({ fault_id: fault.id, storage_path: path, uploaded_by: user.id })
+        setProgress(Math.round(((i + 1) / photos.length) * 100))
       }
 
       sessionStorage.removeItem('htf_fault_draft')
       setSubmitted(true)
-    } catch (e) {
+    } catch {
       toast('Er is een fout opgetreden bij het versturen.', 'error')
     }
 
     setUploading(false)
   }
 
-  const score = computeQualityScore({
-    photoCount: photos.length,
-    notes,
-    faultType,
-    submittedSameDay: true,
-  })
+  const score = computeQualityScore({ photoCount: photos.length, notes, faultType, submittedSameDay: true })
 
   if (submitted) {
     return (
@@ -147,12 +137,10 @@ export default function FaultForm() {
         <div style={{ fontFamily: "'Barlow Condensed'", letterSpacing: 2, fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
           — Hi Tom Fleet Team
         </div>
-        <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, color: 'var(--gold)', marginBottom: 32 }}>
+        <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, color: 'var(--gold)', marginBottom: 32 }}>
           Kwaliteitsscore: {score.toFixed(1)} ★
         </div>
-        <button className="btn btn-ghost" onClick={() => navigate('/dashboard')}>
-          ← Terug naar dashboard
-        </button>
+        <button className="btn btn-ghost" onClick={() => navigate('/dashboard')}>← Terug naar dashboard</button>
       </div>
     )
   }
@@ -167,13 +155,13 @@ export default function FaultForm() {
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/dashboard')}>← Terug</button>
       </div>
 
-      {/* Instruction box */}
+      {/* Instruction */}
       <div className="htf-card htf-card-gold" style={{ marginBottom: 20, background: '#FFFBF0' }}>
         <div className="lbl" style={{ color: 'var(--gold)' }}>Instructie</div>
         <p style={{ fontSize: 13, lineHeight: 1.7 }}>
           We kunnen ons beter voorbereiden als storingen zo duidelijk en specifiek mogelijk worden gemeld.
-          Beschrijf het probleem gedetailleerd en upload zo volledig mogelijke foto's (minimaal 2, max 8).
-          Dit bespaart ons tijd en kosten. We rekenen op jouw medewerking.
+          Beschrijf het probleem gedetailleerd en upload zo volledig mogelijke foto's (minimaal 2, max {MAX_PHOTOS}).
+          Foto's worden automatisch gecomprimeerd. Dit bespaart ons tijd en kosten. We rekenen op jouw medewerking.
         </p>
       </div>
 
@@ -181,7 +169,7 @@ export default function FaultForm() {
         {/* Step 1: Vehicle */}
         <div className="field">
           <label className="lbl">① Voertuig selecteren</label>
-          <select className="sel" value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setFaultType(''); setStep(2) }}>
+          <select className="sel" value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setFaultType('') }}>
             <option value="">— Kies voertuig —</option>
             {vehicles.map((v) => (
               <option key={v.id} value={v.id}>
@@ -197,11 +185,18 @@ export default function FaultForm() {
           )}
         </div>
 
+        {/* Duplicate warning */}
+        {warnDuplicate && (
+          <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 3, padding: '10px 14px', marginBottom: 14, fontSize: 13 }}>
+            ⚠ <strong>Let op:</strong> er is al een actieve storing voor dit voertuig. Je kunt toch doorgaan als het een ander probleem betreft.
+          </div>
+        )}
+
         {/* Step 2: Fault type */}
         {selected && (
           <div className="field">
             <label className="lbl">② Type storing</label>
-            <select className="sel" value={faultType} onChange={(e) => { setFaultType(e.target.value); setStep(3) }}>
+            <select className="sel" value={faultType} onChange={(e) => setFaultType(e.target.value)}>
               <option value="">— Kies storing —</option>
               {opts.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
@@ -213,16 +208,11 @@ export default function FaultForm() {
           <div className="field">
             <label className="lbl">
               ③ Foto's uploaden{' '}
-              <span style={{ color: 'var(--red)' }}>* minimaal 2 vereist</span>
-              {' '}<span style={{ color: 'var(--muted)' }}>({photos.length}/{MAX_PHOTOS})</span>
+              <span style={{ color: 'var(--red)' }}>* minimaal 2</span>
+              <span style={{ color: 'var(--muted)' }}> · max {MAX_PHOTOS} · auto-gecomprimeerd tot 2 MB</span>
             </label>
             <div className="photo-box" onClick={() => document.getElementById('photo-input')!.click()}>
-              <input
-                id="photo-input"
-                type="file" accept="image/*" multiple
-                style={{ display: 'none' }}
-                onChange={handlePhotoAdd}
-              />
+              <input id="photo-input" type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoAdd} />
               {previews.length === 0 ? (
                 <>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
@@ -247,16 +237,9 @@ export default function FaultForm() {
                 </div>
               )}
             </div>
-            {photos.length > 0 && photos.length < 2 && (
-              <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 4, fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-                Nog {2 - photos.length} foto{photos.length === 1 ? '' : "'s"} nodig
-              </div>
-            )}
-            {photos.length >= 2 && (
-              <div style={{ fontSize: 12, color: 'var(--green)', marginTop: 4, fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-                ✓ {photos.length} foto{photos.length !== 1 ? "'s" : ''} geselecteerd
-              </div>
-            )}
+            <div style={{ fontSize: 12, marginTop: 4, fontFamily: "'Barlow Condensed'", letterSpacing: 1, color: photos.length >= 2 ? 'var(--green)' : 'var(--red)' }}>
+              {photos.length >= 2 ? `✓ ${photos.length} foto's geselecteerd` : photos.length > 0 ? `Nog ${2 - photos.length} foto('s) nodig` : ''}
+            </div>
           </div>
         )}
 
@@ -267,19 +250,29 @@ export default function FaultForm() {
               ④ Aanvullende opmerkingen{' '}
               <span style={{ color: 'var(--muted)' }}>(optioneel · verhoogt kwaliteitsscore)</span>
             </label>
-            <textarea
-              className="txa"
-              placeholder="Beschrijf het probleem zo specifiek mogelijk…"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            <textarea className="txa" placeholder="Beschrijf het probleem zo specifiek mogelijk…" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         )}
 
-        {/* Quality preview */}
+        {/* Upload progress bar */}
+        {uploading && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)', marginBottom: 4 }}>
+              Foto's uploaden… {progress}%
+            </div>
+            <div style={{ height: 6, background: '#F5E6CC', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress}%`, background: 'var(--green)', borderRadius: 3, transition: 'width 0.2s ease' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Quality score preview */}
         {faultType && photos.length > 0 && (
           <div style={{ background: 'var(--cream2)', borderRadius: 3, padding: '8px 12px', marginBottom: 16, fontSize: 12, fontFamily: "'Barlow Condensed'", letterSpacing: 1, color: 'var(--gold)' }}>
             Verwachte kwaliteitsscore: <strong>{score.toFixed(1)} ★</strong>
+            {score >= 6 && ' — Uitstekend!'}
+            {score >= 4 && score < 6 && ' — Goed'}
+            {score < 4 && ' — Voeg notities en meer foto\'s toe voor een hogere score'}
           </div>
         )}
 
@@ -291,7 +284,7 @@ export default function FaultForm() {
             onClick={handleSubmit}
             disabled={photos.length < 2 || uploading}
           >
-            {uploading ? 'Versturen…' : 'Storing versturen →'}
+            {uploading ? `Versturen… ${progress}%` : 'Storing versturen →'}
           </button>
         )}
       </div>

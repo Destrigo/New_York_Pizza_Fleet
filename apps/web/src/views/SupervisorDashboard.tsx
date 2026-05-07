@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
 import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
-import { MOCK_FAULTS, MOCK_VEHICLES, MOCK_LOCATIONS, MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
-import type { FaultStatus, VehicleType } from '@/types'
+import { MOCK_LOCATIONS, MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
+import { MOCK_MODE } from '@/lib/supabase'
+import { useFaults } from '@/hooks/useFaults'
+import { useVehicles } from '@/hooks/useVehicles'
+import type { Fault, FaultStatus, Vehicle, VehicleType } from '@/types'
 
 type RankPeriod = 'month' | 'prev' | 'ytd'
 
@@ -17,28 +20,36 @@ export default function SupervisorDashboard() {
   const [drillLoc, setDrillLoc] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<FaultStatus | 'all'>('all')
 
+  const { faults: allFaults, loading: fLoading } = useFaults()
+  const { vehicles: allVehicles, loading: vLoading } = useVehicles()
+
   if (!user) return null
+  if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+
+  const activeFaults = allFaults.filter((f) => f.status !== 'closed')
+  const hubVehicles  = allVehicles.filter((v) => v.location_id === 'hub-hfd' || v.location_id === 'hub-ens')
 
   const totalByType = (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).map((t) => ({
     type: t,
-    total: MOCK_VEHICLES.filter((v) => v.type === t).length,
-    ok:    MOCK_VEHICLES.filter((v) => v.type === t && v.status === 'ok').length,
-    fault: MOCK_VEHICLES.filter((v) => v.type === t && (v.status === 'fault' || v.status === 'fix')).length,
+    total: allVehicles.filter((v) => v.type === t).length,
+    ok:    allVehicles.filter((v) => v.type === t && v.status === 'ok').length,
+    fault: allVehicles.filter((v) => v.type === t && (v.status === 'fault' || v.status === 'fix')).length,
   }))
 
-  const activeFaults = MOCK_FAULTS.filter((f) => f.status !== 'closed')
-  const hubVehicles  = MOCK_VEHICLES.filter((v) => v.location_id === 'hub-hfd' || v.location_id === 'hub-ens')
-
   const filteredFaults = filterStatus === 'all'
-    ? MOCK_FAULTS
-    : MOCK_FAULTS.filter((f) => f.status === filterStatus)
+    ? allFaults
+    : allFaults.filter((f) => f.status === filterStatus)
 
-  const drillFaults = drillLoc
-    ? MOCK_FAULTS.filter((f) => f.location_id === drillLoc)
-    : []
-  const drillVehicles = drillLoc
-    ? MOCK_VEHICLES.filter((v) => v.location_id === drillLoc)
-    : []
+  const drillFaults   = drillLoc ? allFaults.filter((f) => f.location_id === drillLoc) : []
+  const drillVehicles = drillLoc ? allVehicles.filter((v) => v.location_id === drillLoc) : []
+
+  const getFaultLoc = (f: Fault) => MOCK_MODE ? MOCK_LOC_MAP[f.location_id] : f.location
+  const getFaultVehicleIcon = (f: Fault) => {
+    const type = MOCK_MODE
+      ? allVehicles.find((v) => v.id === f.vehicle_id)?.type
+      : f.vehicle?.type
+    return vehicleTypeIcon[type ?? '']
+  }
 
   return (
     <div>
@@ -56,7 +67,6 @@ export default function SupervisorDashboard() {
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <>
-          {/* Fleet stats by type */}
           <div className="htf-sh"><h2>Vloot overzicht</h2><div className="htf-rule" /></div>
           <div className="htf-stats" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>
             {totalByType.map((t) => (
@@ -73,7 +83,6 @@ export default function SupervisorDashboard() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* Active faults */}
             <div className="htf-card">
               <div className="htf-sh"><h2>Actieve storingen</h2><div className="htf-rule" /></div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
@@ -92,13 +101,12 @@ export default function SupervisorDashboard() {
               <button className="btn btn-ghost btn-sm" onClick={() => setTab('faults')}>Alle storingen →</button>
             </div>
 
-            {/* Hub inventory */}
             <div className="htf-card htf-card-green">
               <div className="htf-sh"><h2>Hub inventaris</h2><div className="htf-rule" /></div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
                 {hubVehicles.length} voertuigen in Hub
               </div>
-              {hubVehicles.slice(0, 6).map((v) => (
+              {hubVehicles.slice(0, 6).map((v: Vehicle) => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #F5E6CC' }}>
                   <span>{vehicleTypeIcon[v.type]}</span>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{v.id}</span>
@@ -128,23 +136,22 @@ export default function SupervisorDashboard() {
             ))}
           </div>
           <div className="htf-card" style={{ padding: 0 }}>
-            {filteredFaults.map((f) => {
-              const loc = MOCK_LOC_MAP[f.location_id]
-              return (
-                <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div className="fault-row">
-                    <div className="v-icon">{vehicleTypeIcon[MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)?.type ?? '']}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{f.vehicle_id} · {loc?.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
-                        {f.fault_type} · {fmtDateTime(f.created_at)}
-                      </div>
+            {filteredFaults.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Geen storingen gevonden.</div>
+            ) : filteredFaults.map((f) => (
+              <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="fault-row">
+                  <div className="v-icon">{getFaultVehicleIcon(f)}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{f.vehicle_id} · {getFaultLoc(f)?.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
+                      {f.fault_type} · {fmtDateTime(f.created_at)}
                     </div>
-                    <FaultBadge status={f.status} />
                   </div>
-                </Link>
-              )
-            })}
+                  <FaultBadge status={f.status} />
+                </div>
+              </Link>
+            ))}
           </div>
         </>
       )}
@@ -210,7 +217,9 @@ export default function SupervisorDashboard() {
                 <div>
                   <div className="htf-sh"><h2>Voertuigen</h2><div className="htf-rule" /></div>
                   <div className="htf-card" style={{ padding: 0 }}>
-                    {drillVehicles.map((v) => (
+                    {drillVehicles.length === 0 ? (
+                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>Geen voertuigen</div>
+                    ) : drillVehicles.map((v) => (
                       <div key={v.id} style={{ display: 'flex', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F5E6CC', alignItems: 'center' }}>
                         <span style={{ fontSize: 18 }}>{vehicleTypeIcon[v.type]}</span>
                         <Link to={`/vehicles/${v.id}`} style={{ fontWeight: 600, flex: 1, textDecoration: 'none', color: 'var(--red)' }}>{v.id}</Link>
@@ -244,8 +253,8 @@ export default function SupervisorDashboard() {
               <div className="htf-sh"><h2>Alle locaties</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
                 {MOCK_LOCATIONS.filter((l) => !l.is_hub).map((loc) => {
-                  const faultCnt = MOCK_FAULTS.filter((f) => f.location_id === loc.id && f.status !== 'closed').length
-                  const vCnt     = MOCK_VEHICLES.filter((v) => v.location_id === loc.id).length
+                  const faultCnt = allFaults.filter((f) => f.location_id === loc.id && f.status !== 'closed').length
+                  const vCnt     = allVehicles.filter((v) => v.location_id === loc.id).length
                   return (
                     <div key={loc.id} className="fault-row" style={{ cursor: 'pointer' }} onClick={() => setDrillLoc(loc.id)}>
                       <div style={{ flex: 1 }}>

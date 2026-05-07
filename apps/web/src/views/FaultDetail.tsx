@@ -1,88 +1,50 @@
-import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { FaultBadge } from '@/components/StatusBadge'
 import ChatPanel from '@/components/ChatPanel'
 import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
-import { MOCK_FAULTS, MOCK_MESSAGES, MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
-import { MOCK_MODE } from '@/lib/supabase'
-import type { Fault, ChatMessage } from '@/types'
+import { MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
+import { useFault } from '@/hooks/useFaults'
+import { useMessages } from '@/hooks/useMessages'
+import type { Fault } from '@/types'
 
 export default function FaultDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const toast = useToast()
 
-  const [fault, setFault]       = useState<Fault | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [loading, setLoading]   = useState(true)
-
-  useEffect(() => {
-    if (!id) return
-    if (MOCK_MODE) {
-      const f = MOCK_FAULTS.find((x) => x.id === id) ?? null
-      setFault(f)
-      setMessages(MOCK_MESSAGES[id] ?? [])
-      setLoading(false)
-      return
-    }
-    // Real: fetch fault + messages
-    Promise.all([
-      import('@/lib/supabase').then(({ supabase }) =>
-        supabase!.from('faults').select('*, vehicle:vehicles(*), location:locations(*), reporter:users(*)').eq('id', id).single()
-      ),
-      import('@/lib/supabase').then(({ supabase }) =>
-        supabase!.from('chat_messages').select('*, sender:users(*)').eq('fault_id', id).order('created_at')
-      ),
-    ]).then(([{ data: f }, { data: msgs }]) => {
-      setFault(f)
-      setMessages(msgs ?? [])
-      setLoading(false)
-    })
-  }, [id])
+  const { fault, loading, setFault } = useFault(id)
+  const { messages, send } = useMessages(id)
 
   if (!user || !id) return null
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
   if (!fault) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--red)' }}>Storing niet gevonden.</div>
 
-  const vehicle = MOCK_MODE ? MOCK_VEHICLES.find((v) => v.id === fault.vehicle_id) : fault.vehicle
-  const loc     = MOCK_MODE ? MOCK_LOC_MAP[fault.location_id] : fault.location
+  const vehicle  = MOCK_MODE ? MOCK_VEHICLES.find((v) => v.id === fault.vehicle_id) : fault.vehicle
+  const loc      = MOCK_MODE ? MOCK_LOC_MAP[fault.location_id] : fault.location
   const reporter = MOCK_MODE ? MOCK_USERS_MAP[fault.reported_by] : fault.reporter
-  const isHub   = user.role === 'mechanic' || user.role === 'supervisor'
-  const canChat = user.role !== 'supervisor'
+  const isHub    = user.role === 'mechanic' || user.role === 'supervisor'
 
-  const sendMessage = (faultId: string, body: string) => {
-    const msg: ChatMessage = {
-      id: Date.now().toString(),
-      fault_id: faultId,
-      sender_id: user.id,
-      body,
-      is_hub_side: isHub,
-      created_at: new Date().toISOString(),
-    }
-    setMessages((prev) => [...prev, msg])
-    toast('Bericht verstuurd.')
-    // In real mode: supabase.from('chat_messages').insert(...)
+  const handleSend = (_faultId: string, body: string) => {
+    send(body, user.id, isHub).then(({ error }) => {
+      if (error) toast('Versturen mislukt.', 'error')
+    })
   }
 
   const updateStatus = async (status: Fault['status']) => {
+    setFault((prev) => prev ? { ...prev, status } : prev)
     if (MOCK_MODE) {
-      setFault((prev) => prev ? { ...prev, status } : prev)
       toast(`Status bijgewerkt naar: ${status}`)
       return
     }
-    // Real
-    await import('@/lib/supabase').then(({ supabase }) =>
-      supabase!.from('faults').update({ status }).eq('id', fault.id)
-    )
-    setFault((prev) => prev ? { ...prev, status } : prev)
+    await supabase!.from('faults').update({ status }).eq('id', fault.id)
     toast('Status bijgewerkt.')
   }
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -100,7 +62,6 @@ export default function FaultDetail() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Left — fault info */}
         <div>
           <div className="htf-card" style={{ marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
@@ -130,7 +91,6 @@ export default function FaultDetail() {
             )}
           </div>
 
-          {/* Hub status controls */}
           {isHub && fault.status !== 'closed' && (
             <div className="htf-card htf-card-green" style={{ marginBottom: 16 }}>
               <div className="lbl">Status wijzigen</div>
@@ -154,13 +114,11 @@ export default function FaultDetail() {
             </div>
           )}
 
-          {/* Vehicle link */}
           <Link to={`/vehicles/${fault.vehicle_id}`} className="btn btn-muted btn-sm" style={{ display: 'inline-block', marginBottom: 16 }}>
             📋 Voertuighistorie {fault.vehicle_id}
           </Link>
         </div>
 
-        {/* Right — chat */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div className="lbl" style={{ marginBottom: 0 }}>Chat met {isHub ? 'locatie' : 'Hub'}</div>
@@ -172,7 +130,7 @@ export default function FaultDetail() {
             faultId={fault.id}
             messages={messages}
             readOnly={user.role === 'supervisor'}
-            onSend={canChat ? sendMessage : undefined}
+            onSend={user.role !== 'supervisor' ? handleSend : undefined}
           />
         </div>
       </div>

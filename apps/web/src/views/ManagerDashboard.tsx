@@ -3,25 +3,37 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge } from '@/components/StatusBadge'
 import { fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
-import { MOCK_FAULTS, MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
+import { MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
+import { useFaults } from '@/hooks/useFaults'
+import { useVehicles } from '@/hooks/useVehicles'
 
 export default function ManagerDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'dashboard' | 'faults' | 'ranking'>('dashboard')
 
-  if (!user) return null
+  const { faults: myFaults, loading: fLoading } = useFaults({ locationId: user?.location_id })
+  const { vehicles: myVehicles, loading: vLoading } = useVehicles({ locationId: user?.location_id })
 
-  const loc = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
-  const myVehicles = MOCK_VEHICLES.filter((v) => v.location_id === user.location_id)
-  const myFaults   = MOCK_FAULTS.filter((f) => f.location_id === user.location_id)
-  const active     = myFaults.filter((f) => f.status !== 'closed')
-  const myRankIdx  = MOCK_RANKING.findIndex((r) => r.location_id === user.location_id)
-  const myRank     = myRankIdx >= 0 ? myRankIdx + 1 : null
+  if (!user) return null
+  if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+
+  const loc    = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
+  const active = myFaults.filter((f) => f.status !== 'closed')
+
+  const myRankIdx = MOCK_RANKING.findIndex((r) => r.location_id === user.location_id)
+  const myRank    = myRankIdx >= 0 ? myRankIdx + 1 : null
 
   const bikes    = myVehicles.filter((v) => v.type === 'ebike').length
   const scooters = myVehicles.filter((v) => v.type === 'scooter').length
+
+  const getVehicleIcon = (vehicleId: string) => {
+    const v = MOCK_MODE
+      ? myVehicles.find((x) => x.id === vehicleId)
+      : myFaults.find((f) => f.vehicle_id === vehicleId)?.vehicle
+    return vehicleTypeIcon[v?.type ?? '']
+  }
 
   return (
     <div>
@@ -79,7 +91,7 @@ export default function ManagerDashboard() {
               myFaults.slice(0, 3).map((f) => (
                 <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div className="fault-row">
-                    <div className="v-icon">{vehicleTypeIcon[MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)?.type ?? '']}</div>
+                    <div className="v-icon">{getVehicleIcon(f.vehicle_id)}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{f.vehicle_id}</div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>{f.fault_type} · {fmtDateTime(f.created_at)}</div>
@@ -106,7 +118,7 @@ export default function ManagerDashboard() {
                 <div className="htf-card" style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 22 }}>{vehicleTypeIcon[MOCK_VEHICLES.find((v) => v.id === f.vehicle_id)?.type ?? '']}</span>
+                      <span style={{ fontSize: 22 }}>{getVehicleIcon(f.vehicle_id)}</span>
                       <div>
                         <div style={{ fontFamily: "'Playfair Display'", fontWeight: 700, fontSize: 17 }}>{f.vehicle_id}</div>
                         <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)' }}>{fmtDateTime(f.created_at)}</div>

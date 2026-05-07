@@ -1,0 +1,71 @@
+import { useState, useEffect } from 'react'
+import type { PickupSchedule } from '@/types'
+import { supabase, MOCK_MODE } from '@/lib/supabase'
+import { MOCK_SCHEDULES } from '@/lib/mock'
+
+interface Options {
+  driverId?: string
+  date?: string
+}
+
+const SELECT_FIELDS = '*, driver:users(full_name), vehicle:vehicles(*), from_location:locations!from_location_id(*), to_location:locations!to_location_id(*)'
+
+export function useSchedules(opts: Options = {}) {
+  const [schedules, setSchedules] = useState<PickupSchedule[]>([])
+  const [loading, setLoading]     = useState(true)
+
+  useEffect(() => {
+    if (MOCK_MODE) {
+      let data = [...MOCK_SCHEDULES]
+      if (opts.driverId) data = data.filter((s) => s.driver_id === opts.driverId)
+      if (opts.date)     data = data.filter((s) => s.scheduled_date === opts.date)
+      data.sort((a, b) => a.time_from.localeCompare(b.time_from))
+      setSchedules(data)
+      setLoading(false)
+      return
+    }
+
+    let q = supabase!
+      .from('pickup_schedules')
+      .select(SELECT_FIELDS)
+      .order('time_from')
+
+    if (opts.driverId) q = q.eq('driver_id', opts.driverId)
+    if (opts.date)     q = q.eq('scheduled_date', opts.date)
+
+    q.then(({ data }) => { setSchedules(data ?? []); setLoading(false) })
+  }, [opts.driverId, opts.date])
+
+  const complete = async (id: string) => {
+    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'completed' } : s))
+    if (!MOCK_MODE) {
+      await supabase!.from('pickup_schedules').update({ status: 'completed' }).eq('id', id)
+    }
+  }
+
+  const cancel = async (id: string) => {
+    setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'cancelled' } : s))
+    if (!MOCK_MODE) {
+      await supabase!.from('pickup_schedules').update({ status: 'cancelled' }).eq('id', id)
+    }
+  }
+
+  const create = async (fields: Omit<PickupSchedule, 'id' | 'created_at' | 'status' | 'driver' | 'vehicle' | 'from_location' | 'to_location'>) => {
+    if (MOCK_MODE) {
+      const newItem: PickupSchedule = { ...fields, id: Date.now().toString(), status: 'planned', created_at: new Date().toISOString() }
+      setSchedules((prev) => [...prev, newItem].sort((a, b) => a.time_from.localeCompare(b.time_from)))
+      return { error: null }
+    }
+    const { data, error } = await supabase!
+      .from('pickup_schedules')
+      .insert({ ...fields, status: 'planned' })
+      .select(SELECT_FIELDS)
+      .single()
+    if (!error && data) {
+      setSchedules((prev) => [...prev, data as PickupSchedule].sort((a, b) => a.time_from.localeCompare(b.time_from)))
+    }
+    return { error }
+  }
+
+  return { schedules, loading, complete, cancel, create }
+}
