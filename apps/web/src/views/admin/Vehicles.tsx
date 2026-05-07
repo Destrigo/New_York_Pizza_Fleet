@@ -1,35 +1,58 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { VehicleBadge } from '@/components/StatusBadge'
 import { vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
-import { MOCK_VEHICLES, MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
+import { useVehicles } from '@/hooks/useVehicles'
 import type { VehicleType, VehicleStatus } from '@/types'
 
 export default function AdminVehicles() {
+  const { user } = useAuth()
   const toast = useToast()
+  const { vehicles, loading } = useVehicles()
   const [filterType, setFilterType] = useState<VehicleType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<VehicleStatus | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ id: '', type: 'ebike', location_id: '' })
 
-  const filtered = MOCK_VEHICLES.filter((v) =>
+  if (!user) return null
+
+  const filtered = vehicles.filter((v) =>
     (filterType === 'all' || v.type === filterType) &&
     (filterStatus === 'all' || v.status === filterStatus)
   )
 
-  const addVehicle = () => {
-    toast(`Voertuig ${form.id} toegevoegd (demo: niet persistent).`)
+  const addVehicle = async () => {
+    if (MOCK_MODE) {
+      toast(`Voertuig ${form.id} toegevoegd (demo: niet persistent).`)
+    } else {
+      await supabase!.from('vehicles').insert({ id: form.id, type: form.type, location_id: form.location_id, status: 'ok', color: null, notes: null })
+      toast(`Voertuig ${form.id} toegevoegd.`)
+    }
     setShowAdd(false)
     setForm({ id: '', type: 'ebike', location_id: '' })
   }
+
+  const retireVehicle = async (vehicleId: string) => {
+    if (MOCK_MODE) {
+      toast(`${vehicleId} buiten dienst gesteld (demo).`)
+      return
+    }
+    await supabase!.from('vehicles').update({ status: 'hub', notes: 'Buiten dienst' }).eq('id', vehicleId)
+    toast(`${vehicleId} buiten dienst gesteld.`)
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div className="htf-title">Voertuigbeheer</div>
-          <div className="htf-sub">Admin · {MOCK_VEHICLES.length} voertuigen totaal</div>
+          <div className="htf-sub">Admin · {vehicles.length} voertuigen totaal</div>
         </div>
         <button className="btn btn-green" onClick={() => setShowAdd(true)}>+ Voertuig toevoegen</button>
       </div>
@@ -87,7 +110,7 @@ export default function AdminVehicles() {
           </thead>
           <tbody>
             {filtered.map((v) => {
-              const loc = MOCK_LOC_MAP[v.location_id]
+              const locName = MOCK_MODE ? MOCK_LOC_MAP[v.location_id]?.name : v.location?.name
               return (
                 <tr key={v.id}>
                   <td>
@@ -96,10 +119,10 @@ export default function AdminVehicles() {
                     </Link>
                   </td>
                   <td>{vehicleTypeLabel[v.type]}</td>
-                  <td style={{ fontSize: 13 }}>{loc?.name}</td>
+                  <td style={{ fontSize: 13 }}>{locName}</td>
                   <td><VehicleBadge status={v.status} /></td>
                   <td>
-                    <button className="btn btn-muted btn-sm" onClick={() => toast(`${v.id} buiten dienst gesteld (demo).`)}>
+                    <button className="btn btn-muted btn-sm" onClick={() => retireVehicle(v.id)}>
                       Pensioneren
                     </button>
                   </td>
@@ -109,7 +132,7 @@ export default function AdminVehicles() {
           </tbody>
         </table>
         <div style={{ padding: '8px 12px', fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)' }}>
-          {filtered.length} van {MOCK_VEHICLES.length} voertuigen
+          {filtered.length} van {vehicles.length} voertuigen
         </div>
       </div>
     </div>
