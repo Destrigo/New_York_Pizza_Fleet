@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
-import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
+import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
 import { MOCK_LOCATIONS, MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
@@ -124,7 +124,7 @@ export default function SupervisorDashboard() {
       {/* ── FAULTS ── */}
       {tab === 'faults' && (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
             {(['all', 'open', 'in_progress', 'ready', 'closed'] as const).map((s) => (
               <button
                 key={s}
@@ -134,6 +134,26 @@ export default function SupervisorDashboard() {
                 {s === 'all' ? 'Alle' : s === 'open' ? 'Storing' : s === 'in_progress' ? 'Start Fix' : s === 'ready' ? 'Klaar' : 'Gesloten'}
               </button>
             ))}
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => exportCsv(
+                filteredFaults.map((f) => ({
+                  id: f.id,
+                  voertuig: f.vehicle_id,
+                  locatie: getFaultLoc(f)?.name ?? f.location_id,
+                  type: f.fault_type,
+                  status: f.status,
+                  fotos: f.photo_count,
+                  kwaliteit: f.quality_score ?? '',
+                  datum: fmtDateTime(f.created_at),
+                  notities: f.notes ?? '',
+                })),
+                `storingen-${new Date().toISOString().split('T')[0]}.csv`
+              )}
+            >
+              ↓ CSV exporteren
+            </button>
           </div>
           <div className="htf-card" style={{ padding: 0 }}>
             {filteredFaults.length === 0 ? (

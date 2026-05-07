@@ -8,6 +8,7 @@ import { MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useFault } from '@/hooks/useFaults'
 import { useMessages } from '@/hooks/useMessages'
+import { useFaultPhotos } from '@/hooks/useFaultPhotos'
 import type { Fault } from '@/types'
 
 export default function FaultDetail() {
@@ -17,6 +18,7 @@ export default function FaultDetail() {
 
   const { fault, loading, setFault } = useFault(id)
   const { messages, send } = useMessages(id)
+  const { photos } = useFaultPhotos(id)
 
   if (!user || !id) return null
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -90,6 +92,37 @@ export default function FaultDetail() {
               </div>
             )}
           </div>
+
+          {(fault.photo_count > 0 || photos.length > 0) && (
+            <div className="htf-card" style={{ marginBottom: 16 }}>
+              <div className="lbl" style={{ marginBottom: 8 }}>
+                Foto's ({MOCK_MODE ? fault.photo_count : photos.length})
+              </div>
+              {MOCK_MODE ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {Array.from({ length: fault.photo_count }).map((_, i) => (
+                    <div key={i} style={{ width: 80, height: 80, background: 'var(--cream2)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--muted)' }}>
+                      📷
+                    </div>
+                  ))}
+                </div>
+              ) : photos.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Foto's worden geladen…</div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {photos.map((p) => (
+                    <a key={p.id} href={p.signedUrl} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={p.signedUrl}
+                        alt="Storing foto"
+                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--bdr)', cursor: 'zoom-in' }}
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {isHub && fault.status !== 'closed' && (
             <div className="htf-card htf-card-green" style={{ marginBottom: 16 }}>

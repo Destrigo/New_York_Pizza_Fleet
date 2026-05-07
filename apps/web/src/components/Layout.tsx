@@ -1,9 +1,11 @@
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 import Nav from './Nav'
 
 export default function Layout() {
-  const { loading } = useAuth()
+  const { user, loading } = useAuth()
+  usePushNotifications(user?.id)
 
   if (loading) {
     return (
