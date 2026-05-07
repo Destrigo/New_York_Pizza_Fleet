@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
-import { fmtDate } from '@/lib/utils'
+import { exportCsv, fmtDate } from '@/lib/utils'
 import { MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useSchedules } from '@/hooks/useSchedules'
@@ -87,7 +87,27 @@ export default function HubSchedule() {
           <div className="htf-title">Ophaalplanning</div>
           <div className="htf-sub">Hub schedule · Alle chauffeurs</div>
         </div>
-        <button className="btn btn-green" onClick={() => setShowForm(true)}>+ Ophaalmoment aanmaken</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => exportCsv(
+              schedules.map((s) => ({
+                datum: s.scheduled_date,
+                van:   getFromName(s) ?? s.from_location_id,
+                naar:  getToName(s) ?? s.to_location_id,
+                voertuig: s.vehicle_id,
+                chauffeur: getDriverName(s) ?? s.driver_id,
+                tijd:  `${s.time_from}–${s.time_to}`,
+                status: s.status,
+                notities: s.notes ?? '',
+              })),
+              `ophaalplanning-${new Date().toISOString().split('T')[0]}.csv`
+            )}
+          >
+            ↓ CSV
+          </button>
+          <button className="btn btn-green" onClick={() => setShowForm(true)}>+ Ophaalmoment aanmaken</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
