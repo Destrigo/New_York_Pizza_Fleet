@@ -8,6 +8,7 @@ import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useLocations } from '@/hooks/useLocations'
+import { useReserves } from '@/hooks/useReserves'
 import type { RankEntry } from '@/hooks/useRanking'
 import type { Fault, FaultStatus, Vehicle, VehicleType } from '@/types'
 
@@ -26,12 +27,23 @@ export default function SupervisorDashboard() {
   const { faults: allFaults, loading: fLoading } = useFaults()
   const { vehicles: allVehicles, loading: vLoading } = useVehicles()
   const { locations: nonHubLocations } = useLocations({ excludeHub: true })
+  const { reserves } = useReserves()
 
   if (!user) return null
   if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   const activeFaults = allFaults.filter((f) => f.status !== 'closed')
   const hubVehicles  = allVehicles.filter((v) => MOCK_MODE ? (v.location_id === 'hub-hfd' || v.location_id === 'hub-ens') : v.location?.is_hub)
+
+  const shortages = nonHubLocations.flatMap((loc) =>
+    (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).flatMap((type) => {
+      const target = reserves.find((r) => r.location_id === loc.id && r.vehicle_type === type)?.target_count ?? 0
+      if (target === 0) return []
+      const actual = allVehicles.filter((v) => v.location_id === loc.id && v.type === type && v.status === 'ok').length
+      if (actual >= target) return []
+      return [{ locId: loc.id, locName: loc.name, type, actual, target, deficit: target - actual }]
+    })
+  ).sort((a, b) => b.deficit - a.deficit)
 
   // Period filter for ranking
   const now = new Date()
@@ -168,6 +180,42 @@ export default function SupervisorDashboard() {
               )}
             </div>
           </div>
+
+          {shortages.length > 0 && (
+            <>
+              <div className="htf-sh" style={{ marginTop: 24 }}>
+                <h2>Reserve tekort ⚠</h2>
+                <div className="htf-rule" />
+                <Link to="/admin/reserves" className="btn btn-ghost btn-sm">Beheren →</Link>
+              </div>
+              <div className="htf-card" style={{ padding: 0, borderTop: '3px solid var(--red)' }}>
+                {shortages.map((s, i) => (
+                  <div
+                    key={i}
+                    className="fault-row"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => { setDrillLoc(s.locId); setTab('locations') }}
+                  >
+                    <span style={{ fontSize: 20 }}>{vehicleTypeIcon[s.type]}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{s.locName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
+                        {vehicleTypeLabel[s.type]}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 16, fontWeight: 700, color: 'var(--red)' }}>
+                        {s.actual} / {s.target}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--red)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
+                        -{s.deficit} tekort
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
 
