@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
 import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
-import { MOCK_LOCATIONS, MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
+import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useLocations } from '@/hooks/useLocations'
+import type { RankEntry } from '@/hooks/useRanking'
 import type { Fault, FaultStatus, Vehicle, VehicleType } from '@/types'
 
 type RankPeriod = 'month' | 'prev' | 'ytd'
@@ -22,12 +24,34 @@ export default function SupervisorDashboard() {
 
   const { faults: allFaults, loading: fLoading } = useFaults()
   const { vehicles: allVehicles, loading: vLoading } = useVehicles()
+  const { locations: nonHubLocations } = useLocations({ excludeHub: true })
 
   if (!user) return null
   if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   const activeFaults = allFaults.filter((f) => f.status !== 'closed')
   const hubVehicles  = allVehicles.filter((v) => v.location_id === 'hub-hfd' || v.location_id === 'hub-ens')
+
+  // Compute ranking from loaded fault data
+  const rankGroups: Record<string, { name: string; count: number; scores: number[] }> = {}
+  for (const f of allFaults) {
+    const locId = f.location_id
+    const name  = MOCK_MODE ? (MOCK_LOC_MAP[locId]?.name ?? locId) : (f.location?.name ?? locId)
+    if (!rankGroups[locId]) rankGroups[locId] = { name, count: 0, scores: [] }
+    rankGroups[locId].count++
+    if (f.quality_score != null) rankGroups[locId].scores.push(f.quality_score)
+  }
+  const rankEntries: RankEntry[] = Object.entries(rankGroups).map(([locId, g]) => ({
+    location_id:   locId,
+    location_name: g.name,
+    fault_count:   g.count,
+    quality_avg:   g.scores.length > 0 ? g.scores.reduce((a, b) => a + b, 0) / g.scores.length : 0,
+  }))
+  const rankByFaults  = [...rankEntries].sort((a, b) => b.fault_count - a.fault_count)
+  const rankByQuality = [...rankEntries].sort((a, b) => b.quality_avg - a.quality_avg)
+
+  const getDrillLocName = (locId: string) =>
+    MOCK_MODE ? (MOCK_LOC_MAP[locId]?.name ?? locId) : (nonHubLocations.find((l) => l.id === locId)?.name ?? locId)
 
   const totalByType = (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).map((t) => ({
     type: t,
@@ -191,31 +215,25 @@ export default function SupervisorDashboard() {
             <div>
               <div className="htf-sh"><h2>Ranking storingen</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
-                {MOCK_RANKING.map((r, i) => {
-                  const rLoc = MOCK_LOC_MAP[r.location_id]
-                  return (
-                    <div key={r.location_id} className="rank-row" style={{ cursor: 'pointer' }} onClick={() => { setDrillLoc(r.location_id); setTab('locations') }}>
-                      <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
-                      <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{rLoc?.name}</div></div>
-                      <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 17, fontWeight: 700, color: 'var(--red)' }}>{r.fault_count}</div>
-                    </div>
-                  )
-                })}
+                {rankByFaults.map((r, i) => (
+                  <div key={r.location_id} className="rank-row" style={{ cursor: 'pointer' }} onClick={() => { setDrillLoc(r.location_id); setTab('locations') }}>
+                    <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
+                    <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{r.location_name}</div></div>
+                    <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 17, fontWeight: 700, color: 'var(--red)' }}>{r.fault_count}</div>
+                  </div>
+                ))}
               </div>
             </div>
             <div>
               <div className="htf-sh"><h2>Kwaliteit meldingen ★</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
-                {[...MOCK_RANKING].sort((a, b) => b.quality_avg - a.quality_avg).map((r, i) => {
-                  const rLoc = MOCK_LOC_MAP[r.location_id]
-                  return (
-                    <div key={r.location_id} className="rank-row">
-                      <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
-                      <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{rLoc?.name}</div></div>
-                      <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 17, fontWeight: 700, color: 'var(--gold)' }}>{r.quality_avg.toFixed(1)} ★</div>
-                    </div>
-                  )
-                })}
+                {rankByQuality.map((r, i) => (
+                  <div key={r.location_id} className="rank-row">
+                    <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
+                    <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{r.location_name}</div></div>
+                    <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 17, fontWeight: 700, color: 'var(--gold)' }}>{r.quality_avg.toFixed(1)} ★</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -230,7 +248,7 @@ export default function SupervisorDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setDrillLoc(null)}>← Alle locaties</button>
                 <div style={{ fontFamily: "'Playfair Display'", fontSize: 22, fontWeight: 700 }}>
-                  {MOCK_LOC_MAP[drillLoc]?.name}
+                  {getDrillLocName(drillLoc)}
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -272,7 +290,7 @@ export default function SupervisorDashboard() {
             <>
               <div className="htf-sh"><h2>Alle locaties</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
-                {MOCK_LOCATIONS.filter((l) => !l.is_hub).map((loc) => {
+                {nonHubLocations.map((loc) => {
                   const faultCnt = allFaults.filter((f) => f.location_id === loc.id && f.status !== 'closed').length
                   const vCnt     = allVehicles.filter((v) => v.location_id === loc.id).length
                   return (

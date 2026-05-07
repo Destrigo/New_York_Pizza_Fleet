@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge } from '@/components/StatusBadge'
 import { fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
-import { MOCK_LOC_MAP, MOCK_RANKING } from '@/lib/mock'
+import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useRanking } from '@/hooks/useRanking'
 
 export default function ManagerDashboard() {
   const { user } = useAuth()
@@ -15,6 +16,7 @@ export default function ManagerDashboard() {
 
   const { faults: myFaults, loading: fLoading } = useFaults({ locationId: user?.location_id })
   const { vehicles: myVehicles, loading: vLoading } = useVehicles({ locationId: user?.location_id })
+  const { byFaults, byQuality } = useRanking()
 
   if (!user) return null
   if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -22,7 +24,7 @@ export default function ManagerDashboard() {
   const loc    = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
   const active = myFaults.filter((f) => f.status !== 'closed')
 
-  const myRankIdx = MOCK_RANKING.findIndex((r) => r.location_id === user.location_id)
+  const myRankIdx = byFaults.findIndex((r) => r.location_id === user.location_id)
   const myRank    = myRankIdx >= 0 ? myRankIdx + 1 : null
 
   const bikes    = myVehicles.filter((v) => v.type === 'ebike').length
@@ -146,15 +148,14 @@ export default function ManagerDashboard() {
         <>
           <div className="htf-sh"><h2>Locatie Ranking — Storingen</h2><div className="htf-rule" /></div>
           <div className="htf-card" style={{ padding: 0, marginBottom: 24 }}>
-            {MOCK_RANKING.map((r, i) => {
-              const rLoc = MOCK_LOC_MAP[r.location_id]
+            {byFaults.map((r, i) => {
               const isMe = r.location_id === user.location_id
               return (
                 <div key={r.location_id} className="rank-row" style={{ background: isMe ? 'var(--cream2)' : 'transparent' }}>
                   <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, color: isMe ? 'var(--gold)' : 'var(--ink)' }}>
-                      {rLoc?.name} {isMe && '← jij'}
+                      {r.location_name} {isMe && '← jij'}
                     </div>
                   </div>
                   <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 18, fontWeight: 700, color: 'var(--red)' }}>{r.fault_count} storingen</div>
@@ -165,20 +166,17 @@ export default function ManagerDashboard() {
 
           <div className="htf-sh"><h2>Kwaliteit meldingen ★</h2><div className="htf-rule" /></div>
           <div className="htf-card" style={{ padding: 0 }}>
-            {[...MOCK_RANKING].sort((a, b) => b.quality_avg - a.quality_avg).map((r, i) => {
-              const rLoc = MOCK_LOC_MAP[r.location_id]
-              return (
-                <div key={r.location_id} className="rank-row">
-                  <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600 }}>{rLoc?.name}</div>
-                  </div>
-                  <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>
-                    {r.quality_avg.toFixed(1)} ★
-                  </div>
+            {byQuality.map((r, i) => (
+              <div key={r.location_id} className="rank-row">
+                <div className="rank-n" style={{ color: i === 0 ? 'var(--gold)' : '#D6B87A' }}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>{r.location_name}</div>
                 </div>
-              )
-            })}
+                <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 18, fontWeight: 700, color: 'var(--gold)' }}>
+                  {r.quality_avg.toFixed(1)} ★
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
