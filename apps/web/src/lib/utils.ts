@@ -80,7 +80,7 @@ export function printChatThread(fault: Fault, messages: ChatMessage[]) {
   <div style="margin-top:24px;font-size:11px;color:#999">Gegenereerd door Hi Tom Fleet op ${format(new Date(), 'd MMM yyyy HH:mm', { locale: nl })}</div>
   </body></html>`
 
-  const win = window.open('', '_blank')
+  const win = window.open('', '_blank', 'noopener,noreferrer')
   if (!win) return
   win.document.write(html)
   win.document.close()

@@ -9,7 +9,9 @@ import { useSchedules } from '@/hooks/useSchedules'
 export default function DriverSchedule() {
   const { user } = useAuth()
   const { t } = useI18n()
-  const today = new Date().toISOString().split('T')[0]
+  const today    = new Date().toISOString().split('T')[0]
+  const tomorrowDate = new Date(); tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+  const tomorrow = tomorrowDate.toISOString().split('T')[0]
   const [date, setDate] = useState(today)
 
   const { schedules, loading, complete } = useSchedules({ driverId: user?.id, date })
@@ -26,18 +28,31 @@ export default function DriverSchedule() {
       <div className="htf-title">{t('dashTitle_driver')}</div>
       <div className="htf-sub">{t('role_driver')} · {user.full_name}</div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <label className="lbl" style={{ marginBottom: 0 }}>Datum:</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <button
+          className={`btn btn-sm ${date === today ? 'btn-red' : 'btn-muted'}`}
+          onClick={() => setDate(today)}
+        >
+          Vandaag
+        </button>
+        <button
+          className={`btn btn-sm ${date === tomorrow ? 'btn-red' : 'btn-muted'}`}
+          onClick={() => setDate(tomorrow)}
+        >
+          Morgen
+        </button>
         <input
           className="inp"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          style={{ maxWidth: 200 }}
+          style={{ maxWidth: 180 }}
         />
-        <span style={{ fontSize: 13, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-          {fmtDate(date)}
-        </span>
+        {date !== today && date !== tomorrow && (
+          <span style={{ fontSize: 13, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
+            {fmtDate(date)}
+          </span>
+        )}
       </div>
 
       {loading ? (
