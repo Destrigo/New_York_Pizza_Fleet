@@ -87,6 +87,12 @@ export default function FaultDetail() {
                   {fault.quality_score?.toFixed(1) ?? '—'} ★
                 </div>
               </div>
+              {fault.closed_at && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div className="lbl">Gesloten op</div>
+                  <div style={{ fontSize: 15 }}>{fmtDateTime(fault.closed_at)}</div>
+                </div>
+              )}
             </div>
             {fault.notes && (
               <div style={{ background: 'var(--cream)', border: '1px solid var(--bdr)', borderRadius: 3, padding: '8px 12px', fontSize: 13, fontStyle: 'italic', color: 'var(--muted)' }}>
