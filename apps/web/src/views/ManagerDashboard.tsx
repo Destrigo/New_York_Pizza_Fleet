@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge } from '@/components/StatusBadge'
-import { fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
+import { fmtDate, fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
@@ -86,7 +86,7 @@ export default function ManagerDashboard() {
                   {last ? (
                     <>
                       <div style={{ fontFamily: "'Playfair Display'", fontSize: 18, fontWeight: 700 }}>
-                        {last.scheduled_date}
+                        {fmtDate(last.scheduled_date)}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                         {last.vehicle_id} → {lastFromName}

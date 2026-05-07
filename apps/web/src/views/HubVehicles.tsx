@@ -30,6 +30,7 @@ export default function HubVehicles() {
     if (!targetLoc || selected.length === 0) return
     const loc = destLocations.find((l) => l.id === targetLoc)
     const locName = loc?.name ?? MOCK_LOC_MAP[targetLoc]?.name ?? targetLoc
+    if (!confirm(`${selected.length} voertuig${selected.length !== 1 ? 'en' : ''} toewijzen aan ${locName}?`)) return
     for (const vehicleId of selected) {
       await assign(vehicleId, targetLoc, user.id)
     }

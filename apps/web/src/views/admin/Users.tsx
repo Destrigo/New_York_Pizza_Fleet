@@ -13,7 +13,7 @@ export default function AdminUsers() {
   const [showInvite, setShowInvite] = useState(false)
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'manager' as Role, location_id: '' })
 
-  const deactivate = (id: string, name: string) => {
+  const deactivate = (_id: string, name: string) => {
     if (!confirm(`${name} deactiveren? De gebruiker kan daarna niet meer inloggen.`)) return
     toast('Gebruiker gedeactiveerd' + (MOCK_MODE ? ' (demo: niet persistent).' : '.'))
   }

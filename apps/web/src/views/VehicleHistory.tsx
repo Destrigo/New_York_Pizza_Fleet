@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
-import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
+import { exportCsv, fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
 import { MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useVehicle } from '@/hooks/useVehicles'
@@ -57,7 +57,29 @@ export default function VehicleHistory() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div>
-          <div className="htf-sh"><h2>Storingshistorie</h2><div className="htf-rule" /></div>
+          <div className="htf-sh">
+            <h2>Storingshistorie</h2>
+            <div className="htf-rule" />
+            {faults.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => exportCsv(
+                  faults.map((f) => ({
+                    voertuig: f.vehicle_id,
+                    type: f.fault_type,
+                    status: f.status,
+                    fotos: f.photo_count,
+                    kwaliteit: f.quality_score ?? '',
+                    datum: fmtDateTime(f.created_at),
+                    notities: f.notes ?? '',
+                  })),
+                  `${id}-storingen.csv`
+                )}
+              >
+                ↓ CSV
+              </button>
+            )}
+          </div>
           {faults.length === 0 ? (
             <div className="htf-card" style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>
               Geen storingen geregistreerd.
