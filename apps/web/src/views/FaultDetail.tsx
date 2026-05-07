@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { FaultBadge } from '@/components/StatusBadge'
 import ChatPanel from '@/components/ChatPanel'
-import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
+import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, printChatThread } from '@/lib/utils'
 import { MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useFault } from '@/hooks/useFaults'
@@ -15,6 +16,7 @@ export default function FaultDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const toast = useToast()
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   const { fault, loading, setFault } = useFault(id)
   const { messages, send } = useMessages(id)
@@ -111,13 +113,13 @@ export default function FaultDetail() {
               ) : (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {photos.map((p) => (
-                    <a key={p.id} href={p.signedUrl} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src={p.signedUrl}
-                        alt="Storing foto"
-                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--bdr)', cursor: 'zoom-in' }}
-                      />
-                    </a>
+                    <img
+                      key={p.id}
+                      src={p.signedUrl}
+                      alt="Storing foto"
+                      onClick={() => setLightbox(p.signedUrl)}
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--bdr)', cursor: 'zoom-in' }}
+                    />
                   ))}
                 </div>
               )}
@@ -155,6 +157,15 @@ export default function FaultDetail() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <div className="lbl" style={{ marginBottom: 0 }}>Chat met {isHub ? 'locatie' : 'Hub'}</div>
+            {user.role === 'supervisor' && messages.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => printChatThread(fault, messages)}
+              >
+                ↓ PDF
+              </button>
+            )}
           </div>
           <div className="policy-banner" style={{ borderRadius: '4px 4px 0 0', fontSize: 11 }}>
             📵 Communicatie verloopt uitsluitend via Hi Tom Fleet. Geen telefonisch contact.
@@ -167,6 +178,30 @@ export default function FaultDetail() {
           />
         </div>
       </div>
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={lightbox}
+            alt="Vergroot"
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 4, boxShadow: '0 0 40px rgba(0,0,0,0.5)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightbox(null)}
+            style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', fontSize: 28, cursor: 'pointer', borderRadius: '50%', width: 44, height: 44 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }
