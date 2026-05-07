@@ -13,7 +13,8 @@ export default function AdminUsers() {
   const [showInvite, setShowInvite] = useState(false)
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'manager' as Role, location_id: '' })
 
-  const deactivate = (_id: string) => {
+  const deactivate = (id: string, name: string) => {
+    if (!confirm(`${name} deactiveren? De gebruiker kan daarna niet meer inloggen.`)) return
     toast('Gebruiker gedeactiveerd' + (MOCK_MODE ? ' (demo: niet persistent).' : '.'))
   }
 
@@ -89,7 +90,7 @@ export default function AdminUsers() {
                   <td><span className="badge badge-muted">{roleLabel[u.role]}</span></td>
                   <td style={{ fontSize: 13 }}>{locName ?? u.location_id}</td>
                   <td>
-                    <button className="btn btn-muted btn-sm" onClick={() => deactivate(u.id)}>Deactiveren</button>
+                    <button className="btn btn-muted btn-sm" onClick={() => deactivate(u.id, u.full_name)}>Deactiveren</button>
                   </td>
                 </tr>
               )

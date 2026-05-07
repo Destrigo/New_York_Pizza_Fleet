@@ -39,6 +39,7 @@ export default function AdminVehicles() {
   }
 
   const retireVehicle = async (vehicleId: string) => {
+    if (!confirm(`${vehicleId} buiten dienst stellen? Dit zet de status naar 'hub'.`)) return
     if (MOCK_MODE) {
       toast(`${vehicleId} buiten dienst gesteld (demo).`)
       return

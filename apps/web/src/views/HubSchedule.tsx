@@ -73,6 +73,7 @@ export default function HubSchedule() {
   }
 
   const handleCancel = async (id: string) => {
+    if (!confirm('Weet je zeker dat je dit ophaalmoment wilt annuleren?')) return
     await cancel(id)
     toast('Ophaalmoment geannuleerd.')
   }
