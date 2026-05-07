@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge } from '@/components/StatusBadge'
-import { fmtDate, fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
+import { exportCsv, fmtDate, fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
@@ -130,7 +130,29 @@ export default function ManagerDashboard() {
 
       {tab === 'faults' && (
         <>
-          <div className="htf-sh"><h2>Storingenlog</h2><div className="htf-rule" /></div>
+          <div className="htf-sh">
+            <h2>Storingenlog</h2>
+            <div className="htf-rule" />
+            {myFaults.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => exportCsv(
+                  myFaults.map((f) => ({
+                    voertuig: f.vehicle_id,
+                    type: f.fault_type,
+                    status: f.status,
+                    fotos: f.photo_count,
+                    kwaliteit: f.quality_score ?? '',
+                    datum: fmtDateTime(f.created_at),
+                    notities: f.notes ?? '',
+                  })),
+                  `storingen-${loc?.name ?? 'locatie'}-${new Date().toISOString().split('T')[0]}.csv`
+                )}
+              >
+                ↓ CSV
+              </button>
+            )}
+          </div>
           {myFaults.length === 0 ? (
             <div className="htf-card" style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
               ✓ Geen storingen voor {loc?.name}
