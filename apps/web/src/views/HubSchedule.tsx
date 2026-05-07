@@ -7,6 +7,7 @@ import { MOCK_MODE } from '@/lib/supabase'
 import { useSchedules } from '@/hooks/useSchedules'
 import { useUsers } from '@/hooks/useUsers'
 import { useLocations } from '@/hooks/useLocations'
+import { useVehicles } from '@/hooks/useVehicles'
 import { useFaults } from '@/hooks/useFaults'
 import type { PickupSchedule } from '@/types'
 
@@ -17,6 +18,8 @@ export default function HubSchedule() {
   const { users: drivers } = useUsers({ role: 'driver' })
   const { locations: allLocations } = useLocations({})
   const { faults: openFaults } = useFaults({ status: ['open', 'in_progress', 'ready'] })
+  const [fromLocId, setFromLocId] = useState('')
+  const { vehicles: fromVehicles } = useVehicles({ locationId: fromLocId || undefined })
   const [showForm, setShowForm]   = useState(false)
   const [filterDriver, setFilterDriver] = useState<string>('all')
 
@@ -108,7 +111,14 @@ export default function HubSchedule() {
             </div>
             <div className="field">
               <label className="lbl">Voertuig ID</label>
-              <input className="inp" placeholder="bv. F-001" value={form.vehicle_id} onChange={(e) => setForm((p) => ({ ...p, vehicle_id: e.target.value }))} />
+              {fromVehicles.length > 0 ? (
+                <select className="sel" value={form.vehicle_id} onChange={(e) => setForm((p) => ({ ...p, vehicle_id: e.target.value }))}>
+                  <option value="">— Kies voertuig —</option>
+                  {fromVehicles.map((v) => <option key={v.id} value={v.id}>{v.id} · {v.type} · {v.status}</option>)}
+                </select>
+              ) : (
+                <input className="inp" placeholder="bv. F-001" value={form.vehicle_id} onChange={(e) => setForm((p) => ({ ...p, vehicle_id: e.target.value }))} />
+              )}
             </div>
             <div className="field">
               <label className="lbl">Datum</label>
@@ -123,7 +133,11 @@ export default function HubSchedule() {
             </div>
             <div className="field">
               <label className="lbl">Van locatie</label>
-              <select className="sel" value={form.from_location_id} onChange={(e) => setForm((p) => ({ ...p, from_location_id: e.target.value }))}>
+              <select className="sel" value={form.from_location_id} onChange={(e) => {
+                const id = e.target.value
+                setForm((p) => ({ ...p, from_location_id: id, vehicle_id: '' }))
+                setFromLocId(id)
+              }}>
                 <option value="">— Kies locatie —</option>
                 {allLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
