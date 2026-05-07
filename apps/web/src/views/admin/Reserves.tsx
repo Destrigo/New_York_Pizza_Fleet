@@ -1,49 +1,36 @@
-import { useState } from 'react'
+import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { vehicleTypeLabel } from '@/lib/utils'
-import { MOCK_LOCATIONS, MOCK_VEHICLES } from '@/lib/mock'
+import { useLocations } from '@/hooks/useLocations'
+import { useVehicles } from '@/hooks/useVehicles'
+import { useReserves } from '@/hooks/useReserves'
 import type { VehicleType } from '@/types'
 
 const VEHICLE_TYPES: VehicleType[] = ['ebike', 'scooter', 'car', 'bus']
 
-interface ReserveTarget {
-  location_id: string
-  vehicle_type: VehicleType
-  target: number
-}
-
 export default function AdminReserves() {
+  const { user } = useAuth()
   const toast = useToast()
-
-  const locs = MOCK_LOCATIONS.filter((l) => !l.is_hub)
-
-  const [targets, setTargets] = useState<ReserveTarget[]>(() =>
-    locs.flatMap((l) =>
-      VEHICLE_TYPES.map((t) => ({
-        location_id: l.id,
-        vehicle_type: t,
-        target: t === 'ebike' ? 5 : t === 'scooter' ? 2 : 0,
-      }))
-    )
-  )
+  const { locations: locs, loading: locsLoading } = useLocations({ excludeHub: true })
+  const { vehicles } = useVehicles()
+  const { reserves, loading: resLoading, upsert } = useReserves()
 
   const getTarget = (locId: string, type: VehicleType) =>
-    targets.find((t) => t.location_id === locId && t.vehicle_type === type)?.target ?? 0
-
-  const setTarget = (locId: string, type: VehicleType, val: number) => {
-    setTargets((prev) =>
-      prev.map((t) =>
-        t.location_id === locId && t.vehicle_type === type ? { ...t, target: val } : t
-      )
-    )
-  }
+    reserves.find((r) => r.location_id === locId && r.vehicle_type === type)?.target_count ?? 0
 
   const getActual = (locId: string, type: VehicleType) =>
-    MOCK_VEHICLES.filter((v) => v.location_id === locId && v.type === type && v.status === 'ok').length
+    vehicles.filter((v) => v.location_id === locId && v.type === type && v.status === 'ok').length
+
+  const handleChange = (locId: string, type: VehicleType, val: number) => {
+    if (!user) return
+    upsert(locId, type, val, user.id)
+  }
 
   const saveAll = () => {
     toast('Reserve targets opgeslagen.')
   }
+
+  if (locsLoading || resLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
@@ -79,7 +66,7 @@ export default function AdminReserves() {
                           min={0}
                           max={99}
                           value={target}
-                          onChange={(e) => setTarget(loc.id, type, parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleChange(loc.id, type, parseInt(e.target.value) || 0)}
                           style={{ width: 60, padding: '4px 8px', border: '1.5px solid var(--bdr)', borderRadius: 3, fontFamily: "'Barlow'", fontSize: 14, background: 'var(--cream)' }}
                         />
                         <span style={{ fontSize: 12, color: below ? 'var(--red)' : 'var(--green)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>

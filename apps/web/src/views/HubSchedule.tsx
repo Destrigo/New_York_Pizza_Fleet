@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { fmtDate } from '@/lib/utils'
-import { MOCK_USERS, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
+import { MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useSchedules } from '@/hooks/useSchedules'
+import { useUsers } from '@/hooks/useUsers'
+import { useLocations } from '@/hooks/useLocations'
 import type { PickupSchedule } from '@/types'
-
-const DRIVERS = MOCK_USERS.filter((u) => u.role === 'driver')
 
 export default function HubSchedule() {
   const { user } = useAuth()
   const toast = useToast()
   const { schedules, loading, cancel, create } = useSchedules({})
+  const { users: drivers } = useUsers({ role: 'driver' })
+  const { locations: allLocations } = useLocations({})
   const [showForm, setShowForm]   = useState(false)
   const [filterDriver, setFilterDriver] = useState<string>('all')
 
@@ -84,7 +86,7 @@ export default function HubSchedule() {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         <button className={`btn btn-sm ${filterDriver === 'all' ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterDriver('all')}>Alle chauffeurs</button>
-        {DRIVERS.map((d) => (
+        {drivers.map((d) => (
           <button key={d.id} className={`btn btn-sm ${filterDriver === d.id ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterDriver(d.id)}>
             {d.full_name}
           </button>
@@ -99,7 +101,7 @@ export default function HubSchedule() {
               <label className="lbl">Chauffeur</label>
               <select className="sel" value={form.driver_id} onChange={(e) => setForm((p) => ({ ...p, driver_id: e.target.value }))}>
                 <option value="">— Kies chauffeur —</option>
-                {DRIVERS.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                {drivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
               </select>
             </div>
             <div className="field">
@@ -121,14 +123,14 @@ export default function HubSchedule() {
               <label className="lbl">Van locatie</label>
               <select className="sel" value={form.from_location_id} onChange={(e) => setForm((p) => ({ ...p, from_location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
-                {Object.values(MOCK_LOC_MAP).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {allLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
             <div className="field">
               <label className="lbl">Naar locatie</label>
               <select className="sel" value={form.to_location_id} onChange={(e) => setForm((p) => ({ ...p, to_location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
-                {Object.values(MOCK_LOC_MAP).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {allLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>

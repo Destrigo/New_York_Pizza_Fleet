@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { useToast } from '@/components/Toast'
 import { roleLabel } from '@/lib/utils'
-import { MOCK_USERS, MOCK_LOC_MAP } from '@/lib/mock'
-import type { User } from '@/types'
+import { MOCK_MODE } from '@/lib/supabase'
+import { useUsers } from '@/hooks/useUsers'
+import { useLocations } from '@/hooks/useLocations'
+import type { Role } from '@/types'
 
 export default function AdminUsers() {
   const toast = useToast()
-  const [users]                 = useState<User[]>(MOCK_USERS)
+  const { users, loading } = useUsers()
+  const { locations } = useLocations({})
   const [showInvite, setShowInvite] = useState(false)
-  const [invite, setInvite]     = useState({ email: '', full_name: '', role: 'manager', location_id: '' })
+  const [invite, setInvite] = useState({ email: '', full_name: '', role: 'manager' as Role, location_id: '' })
 
   const deactivate = (_id: string) => {
-    // In real mode: update user record (not delete — preserve audit trail)
-    toast('Gebruiker gedeactiveerd (demo: niet persistent).')
+    toast('Gebruiker gedeactiveerd' + (MOCK_MODE ? ' (demo: niet persistent).' : '.'))
   }
 
   const sendInvite = () => {
@@ -21,12 +23,14 @@ export default function AdminUsers() {
     setInvite({ email: '', full_name: '', role: 'manager', location_id: '' })
   }
 
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div className="htf-title">Gebruikersbeheer</div>
-          <div className="htf-sub">Admin · Supervisor only</div>
+          <div className="htf-sub">Admin · Supervisor only · {users.length} gebruikers</div>
         </div>
         <button className="btn btn-green" onClick={() => setShowInvite(true)}>+ Gebruiker uitnodigen</button>
       </div>
@@ -45,7 +49,7 @@ export default function AdminUsers() {
             </div>
             <div className="field">
               <label className="lbl">Rol</label>
-              <select className="sel" value={invite.role} onChange={(e) => setInvite((p) => ({ ...p, role: e.target.value }))}>
+              <select className="sel" value={invite.role} onChange={(e) => setInvite((p) => ({ ...p, role: e.target.value as Role }))}>
                 {(['manager', 'mechanic', 'driver', 'supervisor'] as const).map((r) => (
                   <option key={r} value={r}>{roleLabel[r]}</option>
                 ))}
@@ -55,7 +59,7 @@ export default function AdminUsers() {
               <label className="lbl">Locatie</label>
               <select className="sel" value={invite.location_id} onChange={(e) => setInvite((p) => ({ ...p, location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
-                {Object.values(MOCK_LOC_MAP).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
           </div>
@@ -78,12 +82,12 @@ export default function AdminUsers() {
           </thead>
           <tbody>
             {users.map((u) => {
-              const loc = MOCK_LOC_MAP[u.location_id]
+              const locName = MOCK_MODE ? locations.find((l) => l.id === u.location_id)?.name : u.location?.name
               return (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 600 }}>{u.full_name}</td>
                   <td><span className="badge badge-muted">{roleLabel[u.role]}</span></td>
-                  <td style={{ fontSize: 13 }}>{loc?.name ?? u.location_id}</td>
+                  <td style={{ fontSize: 13 }}>{locName ?? u.location_id}</td>
                   <td>
                     <button className="btn btn-muted btn-sm" onClick={() => deactivate(u.id)}>Deactiveren</button>
                   </td>

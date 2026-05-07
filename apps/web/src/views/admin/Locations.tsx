@@ -1,24 +1,42 @@
 import { useState } from 'react'
 import { useToast } from '@/components/Toast'
-import { MOCK_LOCATIONS, MOCK_VEHICLES, MOCK_USERS } from '@/lib/mock'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
+import { useLocations } from '@/hooks/useLocations'
+import { useVehicles } from '@/hooks/useVehicles'
+import { useUsers } from '@/hooks/useUsers'
 
 export default function AdminLocations() {
   const toast = useToast()
+  const { locations, loading } = useLocations({})
+  const { vehicles } = useVehicles()
+  const { users } = useUsers()
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', city: '', address: '', is_hub: false })
 
-  const save = () => {
-    toast(`Locatie "${form.name}" aangemaakt (demo: niet persistent).`)
+  const save = async () => {
+    if (MOCK_MODE) {
+      toast(`Locatie "${form.name}" aangemaakt (demo: niet persistent).`)
+    } else {
+      await supabase!.from('locations').insert({
+        name: form.name,
+        city: form.city,
+        address: form.address,
+        is_hub: form.is_hub,
+      })
+      toast(`Locatie "${form.name}" aangemaakt.`)
+    }
     setShowAdd(false)
     setForm({ name: '', city: '', address: '', is_hub: false })
   }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div className="htf-title">Locatiebeheer</div>
-          <div className="htf-sub">Admin · {MOCK_LOCATIONS.length} locaties</div>
+          <div className="htf-sub">Admin · {locations.length} locaties</div>
         </div>
         <button className="btn btn-green" onClick={() => setShowAdd(true)}>+ Locatie toevoegen</button>
       </div>
@@ -54,9 +72,12 @@ export default function AdminLocations() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_LOCATIONS.map((loc) => {
-              const managers = MOCK_USERS.filter((u) => u.location_id === loc.id && u.role === 'manager').map((u) => u.full_name).join(', ')
-              const vCnt     = MOCK_VEHICLES.filter((v) => v.location_id === loc.id).length
+            {locations.map((loc) => {
+              const managers = users
+                .filter((u) => u.location_id === loc.id && u.role === 'manager')
+                .map((u) => u.full_name)
+                .join(', ')
+              const vCnt = vehicles.filter((v) => v.location_id === loc.id).length
               return (
                 <tr key={loc.id}>
                   <td style={{ fontWeight: 600 }}>{loc.name}</td>

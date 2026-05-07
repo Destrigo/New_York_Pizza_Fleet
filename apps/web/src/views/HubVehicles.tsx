@@ -4,15 +4,17 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { VehicleBadge } from '@/components/StatusBadge'
 import { vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
-import { MOCK_LOCATIONS, MOCK_LOC_MAP } from '@/lib/mock'
+import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useLocations } from '@/hooks/useLocations'
 import type { VehicleType } from '@/types'
 
 export default function HubVehicles() {
   const { user } = useAuth()
   const toast = useToast()
   const { vehicles, loading, assign } = useVehicles({ hubOnly: true })
+  const { locations: destLocations }  = useLocations({ excludeHub: true })
   const [selected, setSelected]     = useState<string[]>([])
   const [targetLoc, setTargetLoc]   = useState('')
   const [filterType, setFilterType] = useState<VehicleType | 'all'>('all')
@@ -26,7 +28,8 @@ export default function HubVehicles() {
 
   const assignAll = async () => {
     if (!targetLoc || selected.length === 0) return
-    const locName = MOCK_LOC_MAP[targetLoc]?.name ?? targetLoc
+    const loc = destLocations.find((l) => l.id === targetLoc)
+    const locName = loc?.name ?? MOCK_LOC_MAP[targetLoc]?.name ?? targetLoc
     for (const vehicleId of selected) {
       await assign(vehicleId, targetLoc, user.id)
     }
@@ -34,10 +37,6 @@ export default function HubVehicles() {
     setSelected([])
     setTargetLoc('')
   }
-
-  const destLocations = MOCK_MODE
-    ? MOCK_LOCATIONS.filter((l) => !l.is_hub)
-    : MOCK_LOCATIONS.filter((l) => !l.is_hub) // TODO: replace with useLocations hook
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
