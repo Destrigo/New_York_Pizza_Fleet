@@ -7,12 +7,14 @@ import { vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useVehicles } from '@/hooks/useVehicles'
+import { useLocations } from '@/hooks/useLocations'
 import type { VehicleType, VehicleStatus } from '@/types'
 
 export default function AdminVehicles() {
   const { user } = useAuth()
   const toast = useToast()
   const { vehicles, loading } = useVehicles()
+  const { locations } = useLocations({})
   const [filterType, setFilterType] = useState<VehicleType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<VehicleStatus | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
@@ -72,7 +74,7 @@ export default function AdminVehicles() {
               <label className="lbl">Startlocatie</label>
               <select className="sel" value={form.location_id} onChange={(e) => setForm((p) => ({ ...p, location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
-                {Object.values(MOCK_LOC_MAP).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
           </div>
