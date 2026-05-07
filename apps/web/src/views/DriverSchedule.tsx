@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { fmtDate } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
@@ -7,6 +8,7 @@ import { useSchedules } from '@/hooks/useSchedules'
 
 export default function DriverSchedule() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate] = useState(today)
 
@@ -21,8 +23,8 @@ export default function DriverSchedule() {
 
   return (
     <div>
-      <div className="htf-title">Mijn Schema</div>
-      <div className="htf-sub">Chauffeur · {user.full_name}</div>
+      <div className="htf-title">{t('dashTitle_driver')}</div>
+      <div className="htf-sub">{t('role_driver')} · {user.full_name}</div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <label className="lbl" style={{ marginBottom: 0 }}>Datum:</label>
@@ -39,7 +41,7 @@ export default function DriverSchedule() {
       </div>
 
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
       ) : myItems.length === 0 ? (
         <div className="htf-card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚐</div>
@@ -84,10 +86,10 @@ export default function DriverSchedule() {
                 </div>
                 <div>
                   {done ? (
-                    <span className="badge badge-green">✓ Voltooid</span>
+                    <span className="badge badge-green">✓ {t('scheduleStatus_completed')}</span>
                   ) : (
                     <button className="btn btn-green btn-sm" onClick={() => complete(s.id)}>
-                      ✓ Voltooid
+                      ✓ {t('scheduleStatus_completed')}
                     </button>
                   )}
                 </div>

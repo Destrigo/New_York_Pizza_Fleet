@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useI18n } from '@/context/I18nContext'
 import { roleLabel } from '@/lib/utils'
 import { MOCK_MODE } from '@/lib/supabase'
 import { MOCK_LOC_MAP } from '@/lib/mock'
@@ -10,6 +11,7 @@ export default function Nav() {
   const navigate = useNavigate()
   const location = useLocation()
   const { unreadCount } = useNotifications()
+  const { lang, setLang } = useI18n()
 
   if (!user) return null
 
@@ -82,6 +84,13 @@ export default function Nav() {
           {locName ? ` · ${locName}` : ''}
         </div>
 
+        <button
+          className="htf-nav-btn"
+          onClick={() => setLang(lang === 'nl' ? 'en' : 'nl')}
+          style={{ fontFamily: "'Barlow Condensed'", letterSpacing: 1, fontSize: 12, opacity: 0.75 }}
+        >
+          {lang === 'nl' ? '🇬🇧 EN' : '🇳🇱 NL'}
+        </button>
         <Link to="/profile" className="htf-nav-btn">Profiel</Link>
         <button className="htf-nav-btn" onClick={handleLogout}>Uitloggen</button>
       </div>
