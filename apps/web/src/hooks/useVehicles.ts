@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Vehicle } from '@/types'
 import { supabase, MOCK_MODE } from '@/lib/supabase'
 import { MOCK_VEHICLES } from '@/lib/mock'
@@ -13,7 +13,7 @@ export function useVehicles(opts: Options = {}) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading]   = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (MOCK_MODE) {
       let data = [...MOCK_VEHICLES]
       if (opts.locationId)     data = data.filter((v) => v.location_id === opts.locationId)
@@ -39,6 +39,18 @@ export function useVehicles(opts: Options = {}) {
     })
   }, [opts.locationId, opts.hubOnly, JSON.stringify(opts.excludeStatus)])
 
+  useEffect(() => { load() }, [load])
+
+  // Realtime subscription for vehicles
+  useEffect(() => {
+    if (MOCK_MODE) return
+    const channel = supabase!
+      .channel('vehicles-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, load)
+      .subscribe()
+    return () => { supabase!.removeChannel(channel) }
+  }, [load])
+
   const assign = async (vehicleId: string, targetLocationId: string, performedBy: string) => {
     if (MOCK_MODE) {
       setVehicles((prev) =>
@@ -63,7 +75,7 @@ export function useVehicles(opts: Options = {}) {
     return { error }
   }
 
-  return { vehicles, loading, assign }
+  return { vehicles, loading, assign, reload: load }
 }
 
 export function useVehicle(id: string | undefined) {

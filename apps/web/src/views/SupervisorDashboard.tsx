@@ -32,9 +32,26 @@ export default function SupervisorDashboard() {
   const activeFaults = allFaults.filter((f) => f.status !== 'closed')
   const hubVehicles  = allVehicles.filter((v) => v.location_id === 'hub-hfd' || v.location_id === 'hub-ens')
 
-  // Compute ranking from loaded fault data
+  // Period filter for ranking
+  const now = new Date()
+  const getPeriodRange = (p: RankPeriod): [string, string] => {
+    const y = now.getFullYear(), m = now.getMonth()
+    if (p === 'month') return [`${y}-${String(m + 1).padStart(2, '0')}-01`, now.toISOString().split('T')[0]]
+    if (p === 'prev') {
+      const pm = m === 0 ? 12 : m, py = m === 0 ? y - 1 : y
+      const lastDay = new Date(y, m, 0).getDate()
+      return [`${py}-${String(pm).padStart(2, '0')}-01`, `${py}-${String(pm).padStart(2, '0')}-${lastDay}`]
+    }
+    return [`${y}-01-01`, now.toISOString().split('T')[0]]
+  }
+  const [rangeFrom, rangeTo] = getPeriodRange(rankPeriod)
+  const periodFaults = allFaults.filter((f) =>
+    f.created_at >= rangeFrom && f.created_at.substring(0, 10) <= rangeTo
+  )
+
+  // Compute ranking from period-filtered faults
   const rankGroups: Record<string, { name: string; count: number; scores: number[] }> = {}
-  for (const f of allFaults) {
+  for (const f of periodFaults) {
     const locId = f.location_id
     const name  = MOCK_MODE ? (MOCK_LOC_MAP[locId]?.name ?? locId) : (f.location?.name ?? locId)
     if (!rankGroups[locId]) rankGroups[locId] = { name, count: 0, scores: [] }
