@@ -132,7 +132,7 @@ export default function SupervisorDashboard() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div className="grid-2">
             <div className="htf-card">
               <div className="htf-sh"><h2>Actieve storingen</h2><div className="htf-rule" /></div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
@@ -244,7 +244,7 @@ export default function SupervisorDashboard() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div className="grid-2">
             <div>
               <div className="htf-sh"><h2>Ranking storingen</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
@@ -284,7 +284,7 @@ export default function SupervisorDashboard() {
                   {getDrillLocName(drillLoc)}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="grid-2">
                 <div>
                   <div className="htf-sh"><h2>Voertuigen</h2><div className="htf-rule" /></div>
                   <div className="htf-card" style={{ padding: 0 }}>

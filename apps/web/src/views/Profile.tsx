@@ -63,7 +63,7 @@ export default function Profile() {
       <div className="htf-title">Profiel</div>
       <div className="htf-sub">{roleLabel[user.role]} · {loc?.name}</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="grid-2">
         <div className="htf-card">
           <div className="htf-sh"><h2>Persoonsgegevens</h2><div className="htf-rule" /></div>
 

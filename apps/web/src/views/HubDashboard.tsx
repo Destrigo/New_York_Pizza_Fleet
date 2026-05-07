@@ -51,7 +51,7 @@ export default function HubDashboard() {
         <div className="htf-stat" style={{ borderTopColor: 'var(--black)' }}><div className="htf-stat-n" style={{ color: 'var(--black)' }}>{hubVehicles.length}</div><div className="htf-stat-l">In Hub</div></div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="grid-2">
         <div>
           <div className="htf-sh">
             <h2>Actieve storingen</h2>

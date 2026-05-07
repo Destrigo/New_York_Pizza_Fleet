@@ -55,7 +55,7 @@ export default function VehicleHistory() {
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="grid-2">
         <div>
           <div className="htf-sh">
             <h2>Storingshistorie</h2>

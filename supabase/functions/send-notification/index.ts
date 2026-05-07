@@ -177,11 +177,19 @@ Deno.serve(async (req) => {
         related_pickup_id: schedule.id,
       })
 
-      // Notify location manager
-      const { data: fault } = await supabase.from('faults').select('reported_by').eq('id', schedule.fault_id).single()
-      if (fault?.reported_by) {
+      // Notify location manager(s): via linked fault's reporter if available,
+      // otherwise notify all managers at the from_location directly.
+      const managerIds: string[] = []
+      if (schedule.fault_id) {
+        const { data: fault } = await supabase.from('faults').select('reported_by').eq('id', schedule.fault_id).single()
+        if (fault?.reported_by) managerIds.push(fault.reported_by)
+      } else {
+        const { data: managers } = await supabase.from('users').select('id').eq('role', 'manager').eq('location_id', schedule.from_location_id)
+        for (const m of managers ?? []) managerIds.push(m.id)
+      }
+      for (const managerId of managerIds) {
         await notify({
-          recipient_id: fault.reported_by,
+          recipient_id: managerId,
           type: 'pickup',
           title: 'Ophaalmoment gepland',
           body: `Beste ${loc?.name}, je staat gepland voor een ophaalmoment op ${schedule.scheduled_date} tussen ${schedule.time_from}–${schedule.time_to}. Geef aanvullende informatie snel door via de Hi Tom Fleet app.`,

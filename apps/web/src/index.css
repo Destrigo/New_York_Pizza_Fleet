@@ -301,6 +301,11 @@ html, body, #root {
 /* ── MOBILE NAV ─────────────────────────────────────────── */
 .htf-mobile-nav { display: none; }
 
+/* ── RESPONSIVE GRID ────────────────────────────────────── */
+.grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 700px) {
   .htf-page { padding: 16px; }
@@ -309,4 +314,11 @@ html, body, #root {
   .tab { padding: 10px 12px; font-size: 11px; }
   .htf-mobile-nav { display: flex; }
   .htf-shell { padding-bottom: 70px; }
+  /* Collapse 2-col grids to single column */
+  .grid-2 { grid-template-columns: 1fr; }
+  /* Hide non-essential nav items on small screens */
+  .htf-nav .htf-role { display: none; }
+  /* Tighten table on mobile */
+  .data-table th:nth-child(3),
+  .data-table td:nth-child(3) { display: none; }
 }
