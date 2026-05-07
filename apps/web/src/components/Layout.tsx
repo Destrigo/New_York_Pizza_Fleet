@@ -4,6 +4,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { usePresence } from '@/hooks/usePresence'
 import Nav from './Nav'
 import MobileNav from './MobileNav'
+import AdminNav from './AdminNav'
 
 export default function Layout() {
   const { user, loading } = useAuth()
@@ -25,6 +26,7 @@ export default function Layout() {
       <div className="checkered" />
       <Nav />
       <main className="htf-page">
+        <AdminNav />
         <Outlet />
       </main>
       <footer className="htf-footer">
