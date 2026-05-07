@@ -39,12 +39,29 @@ export default function HubQueue() {
     toast(`${fault.vehicle_id} → ${faultStatusLabel[next]}`)
   }
 
+  const readyFaults = grouped['ready'] ?? []
+  const closeAllReady = async () => {
+    if (readyFaults.length === 0) return
+    if (!confirm(`${readyFaults.length} klare storing${readyFaults.length !== 1 ? 'en' : ''} afsluiten?`)) return
+    for (const f of readyFaults) await updateStatus(f.id, 'closed')
+    toast(`${readyFaults.length} storingen afgesloten.`)
+  }
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   return (
     <div>
-      <div className="htf-title">Storing Queue</div>
-      <div className="htf-sub">Hub operaties · Live overzicht</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div>
+          <div className="htf-title">Storing Queue</div>
+          <div className="htf-sub">Hub operaties · Live overzicht</div>
+        </div>
+        {readyFaults.length > 0 && (
+          <button className="btn btn-muted btn-sm" onClick={closeAllReady}>
+            Alles klaar afsluiten ({readyFaults.length})
+          </button>
+        )}
+      </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {['all', 'ebike', 'scooter', 'car', 'bus'].map((t) => (

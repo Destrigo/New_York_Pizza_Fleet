@@ -105,6 +105,11 @@ export default function SupervisorDashboard() {
   const drillFaults   = drillLoc ? allFaults.filter((f) => f.location_id === drillLoc) : []
   const drillVehicles = drillLoc ? allVehicles.filter((v) => v.location_id === drillLoc) : []
 
+  const closedWithTime = allFaults.filter((f) => f.status === 'closed' && f.closed_at)
+  const avgResolutionHours = closedWithTime.length > 0
+    ? closedWithTime.reduce((sum, f) => sum + (new Date(f.closed_at!).getTime() - new Date(f.created_at).getTime()) / 3_600_000, 0) / closedWithTime.length
+    : null
+
   const getFaultLoc = (f: Fault) => MOCK_MODE ? MOCK_LOC_MAP[f.location_id] : f.location
   const getFaultVehicleIcon = (f: Fault) => {
     const type = MOCK_MODE
@@ -159,6 +164,16 @@ export default function SupervisorDashboard() {
                     </div>
                   )
                 })}
+                {avgResolutionHours !== null && (
+                  <div style={{ textAlign: 'center', marginLeft: 'auto' }}>
+                    <div style={{ fontFamily: "'Playfair Display'", fontSize: 28, fontWeight: 900, color: 'var(--gold)' }}>
+                      {avgResolutionHours < 24 ? `${avgResolutionHours.toFixed(0)}u` : `${(avgResolutionHours / 24).toFixed(1)}d`}
+                    </div>
+                    <div style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
+                      Gem. looptijd
+                    </div>
+                  </div>
+                )}
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setTab('faults')}>Alle storingen →</button>
             </div>
