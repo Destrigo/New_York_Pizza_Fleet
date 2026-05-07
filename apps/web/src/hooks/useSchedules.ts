@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { PickupSchedule } from '@/types'
 import { supabase, MOCK_MODE } from '@/lib/supabase'
 import { MOCK_SCHEDULES } from '@/lib/mock'
@@ -16,7 +16,7 @@ export function useSchedules(opts: Options = {}) {
   const [schedules, setSchedules] = useState<PickupSchedule[]>([])
   const [loading, setLoading]     = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (MOCK_MODE) {
       let data = [...MOCK_SCHEDULES]
       if (opts.driverId)        data = data.filter((s) => s.driver_id === opts.driverId)
@@ -41,6 +41,18 @@ export function useSchedules(opts: Options = {}) {
 
     q.then(({ data }) => { setSchedules(data ?? []); setLoading(false) })
   }, [opts.driverId, opts.date, opts.fromLocationId, JSON.stringify(opts.status)])
+
+  useEffect(() => { load() }, [load])
+
+  // Realtime subscription
+  useEffect(() => {
+    if (MOCK_MODE) return
+    const channel = supabase!
+      .channel('schedules-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pickup_schedules' }, load)
+      .subscribe()
+    return () => { supabase!.removeChannel(channel) }
+  }, [load])
 
   const complete = async (id: string) => {
     setSchedules((prev) => prev.map((s) => s.id === id ? { ...s, status: 'completed' } : s))
