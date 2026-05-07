@@ -87,7 +87,7 @@ export interface ChatMessage {
 
 export interface PickupSchedule {
   id: string
-  fault_id: string
+  fault_id: string | null
   driver_id: string
   assigned_by: string
   from_location_id: string

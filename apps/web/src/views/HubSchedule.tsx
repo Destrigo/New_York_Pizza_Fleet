@@ -7,6 +7,7 @@ import { MOCK_MODE } from '@/lib/supabase'
 import { useSchedules } from '@/hooks/useSchedules'
 import { useUsers } from '@/hooks/useUsers'
 import { useLocations } from '@/hooks/useLocations'
+import { useFaults } from '@/hooks/useFaults'
 import type { PickupSchedule } from '@/types'
 
 export default function HubSchedule() {
@@ -15,6 +16,7 @@ export default function HubSchedule() {
   const { schedules, loading, cancel, create } = useSchedules({})
   const { users: drivers } = useUsers({ role: 'driver' })
   const { locations: allLocations } = useLocations({})
+  const { faults: openFaults } = useFaults({ status: ['open', 'in_progress', 'ready'] })
   const [showForm, setShowForm]   = useState(false)
   const [filterDriver, setFilterDriver] = useState<string>('all')
 
@@ -47,7 +49,7 @@ export default function HubSchedule() {
 
   const submitSchedule = async () => {
     const { error } = await create({
-      fault_id: form.fault_id || '',
+      fault_id: form.fault_id || null,
       driver_id: form.driver_id,
       assigned_by: user.id,
       from_location_id: form.from_location_id,
@@ -131,6 +133,15 @@ export default function HubSchedule() {
               <select className="sel" value={form.to_location_id} onChange={(e) => setForm((p) => ({ ...p, to_location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
                 {allLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label className="lbl">Gekoppelde storing <span style={{ color: 'var(--muted)' }}>(optioneel)</span></label>
+              <select className="sel" value={form.fault_id} onChange={(e) => setForm((p) => ({ ...p, fault_id: e.target.value }))}>
+                <option value="">— Geen specifieke storing —</option>
+                {openFaults.map((f) => (
+                  <option key={f.id} value={f.id}>{f.vehicle_id} · {f.fault_type}</option>
+                ))}
               </select>
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>
