@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { User, Role } from '@/types'
 import { supabase, MOCK_MODE } from '@/lib/supabase'
 import { MOCK_USERS } from '@/lib/mock'
@@ -12,7 +12,8 @@ export function useUsers(opts: Options = {}) {
   const [users, setUsers]   = useState<User[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
+    setLoading(true)
     if (MOCK_MODE) {
       let data = [...MOCK_USERS]
       if (opts.role)       data = data.filter((u) => u.role === opts.role)
@@ -30,8 +31,21 @@ export function useUsers(opts: Options = {}) {
     if (opts.role)       q = q.eq('role', opts.role)
     if (opts.locationId) q = q.eq('location_id', opts.locationId)
 
-    q.then(({ data }) => { setUsers(data ?? []); setLoading(false) })
+    const { data } = await q
+    setUsers(data ?? [])
+    setLoading(false)
   }, [opts.role, opts.locationId])
 
-  return { users, loading }
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (MOCK_MODE) return
+    const channel = supabase!
+      .channel('users-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => { load() })
+      .subscribe()
+    return () => { supabase!.removeChannel(channel) }
+  }, [load])
+
+  return { users, loading, reload: load }
 }

@@ -70,7 +70,7 @@ export default function DriverSchedule() {
       ) : (
         <>
           <div style={{ marginBottom: 16, fontFamily: "'Barlow Condensed'", fontSize: 13, letterSpacing: 1, color: 'var(--muted)' }}>
-            {myItems.length} rit{myItems.length !== 1 ? 'ten' : ''} vandaag
+            {myItems.length} rit{myItems.length !== 1 ? 'ten' : ''} op {fmtDate(date)}
           </div>
           {myItems.map((s, idx) => {
             const from = getLoc(s.from_location_id, s.from_location)

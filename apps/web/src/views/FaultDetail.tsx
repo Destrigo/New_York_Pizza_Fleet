@@ -60,7 +60,10 @@ export default function FaultDetail() {
             {vehicleTypeLabel[vehicle?.type ?? '']} · {loc?.name} · {fmtDateTime(fault.created_at)}
           </div>
         </div>
-        <Link to={isHub ? '/hub/queue' : '/dashboard'} className="btn btn-ghost btn-sm">
+        <Link
+          to={user.role === 'mechanic' ? '/hub/queue' : user.role === 'supervisor' ? '/supervisor' : user.role === 'driver' ? '/driver/schedule' : '/dashboard'}
+          className="btn btn-ghost btn-sm"
+        >
           ← Terug
         </Link>
       </div>

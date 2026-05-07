@@ -31,7 +31,7 @@ export default function SupervisorDashboard() {
   if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
   const activeFaults = allFaults.filter((f) => f.status !== 'closed')
-  const hubVehicles  = allVehicles.filter((v) => v.location_id === 'hub-hfd' || v.location_id === 'hub-ens')
+  const hubVehicles  = allVehicles.filter((v) => MOCK_MODE ? (v.location_id === 'hub-hfd' || v.location_id === 'hub-ens') : v.location?.is_hub)
 
   // Period filter for ranking
   const now = new Date()
