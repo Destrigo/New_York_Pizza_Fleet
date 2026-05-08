@@ -198,6 +198,33 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── PICKUP SCHEDULE COMPLETE: notify destination managers ───────────────
+    if (table === 'pickup_schedules' && type === 'UPDATE') {
+      const schedule = record
+      const old = event.old_record
+
+      if (schedule.status === 'completed' && old?.status !== 'completed') {
+        const { data: toLoc } = await supabase
+          .from('locations').select('name, is_hub').eq('id', schedule.to_location_id).single()
+
+        // Only notify when delivering to a regular location (not when picking up to Hub)
+        if (toLoc && !toLoc.is_hub) {
+          const { data: managers } = await supabase
+            .from('users').select('id').eq('role', 'manager').eq('location_id', schedule.to_location_id)
+          for (const m of managers ?? []) {
+            await notify({
+              recipient_id: m.id,
+              type: 'vehicle',
+              title: `${schedule.vehicle_id} afgeleverd`,
+              body: `Voertuig ${schedule.vehicle_id} is afgeleverd bij ${toLoc.name}.`,
+              related_pickup_id: schedule.id,
+              related_fault_id: schedule.fault_id ?? undefined,
+            })
+          }
+        }
+      }
+    }
+
     // ── CHAT MESSAGE INSERT: notify other party ─────────────────────────────
     if (table === 'chat_messages' && type === 'INSERT') {
       const msg = record
