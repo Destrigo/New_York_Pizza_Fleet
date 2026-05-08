@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { VehicleBadge } from '@/components/StatusBadge'
-import { vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
+import { vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useVehicles } from '@/hooks/useVehicles'
@@ -17,6 +17,7 @@ export default function AdminVehicles() {
   const { locations } = useLocations({})
   const [filterType, setFilterType] = useState<VehicleType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<VehicleStatus | 'all'>('all')
+  const [search, setSearch]             = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ id: '', type: 'ebike', location_id: '' })
 
@@ -24,7 +25,8 @@ export default function AdminVehicles() {
 
   const filtered = vehicles.filter((v) =>
     (filterType === 'all' || v.type === filterType) &&
-    (filterStatus === 'all' || v.status === filterStatus)
+    (filterStatus === 'all' || v.status === filterStatus) &&
+    (!search || v.id.toLowerCase().includes(search.toLowerCase()))
   )
 
   const addVehicle = async () => {
@@ -57,7 +59,19 @@ export default function AdminVehicles() {
           <div className="htf-title">Voertuigbeheer</div>
           <div className="htf-sub">Admin · {vehicles.length} voertuigen totaal</div>
         </div>
-        <button className="btn btn-green" onClick={() => setShowAdd(true)}>+ Voertuig toevoegen</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => exportCsv(
+              filtered.map((v) => {
+                const locName = MOCK_MODE ? MOCK_LOC_MAP[v.location_id]?.name : v.location?.name
+                return { id: v.id, type: vehicleTypeLabel[v.type], locatie: locName ?? v.location_id, status: v.status }
+              }),
+              `voertuigen-${new Date().toISOString().split('T')[0]}.csv`
+            )}
+          >↓ CSV</button>
+          <button className="btn btn-green" onClick={() => setShowAdd(true)}>+ Voertuig toevoegen</button>
+        </div>
       </div>
 
       {showAdd && (
@@ -86,7 +100,7 @@ export default function AdminVehicles() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         {(['all', 'ebike', 'scooter', 'car', 'bus'] as const).map((t) => (
           <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(t)}>
             {t === 'all' ? 'Alle types' : vehicleTypeLabel[t]}
@@ -98,6 +112,13 @@ export default function AdminVehicles() {
             {s === 'all' ? 'Alle statussen' : s}
           </button>
         ))}
+        <input
+          className="inp"
+          placeholder="Zoek ID…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ maxWidth: 160, height: 32, marginLeft: 'auto' }}
+        />
       </div>
 
       <div className="htf-card" style={{ padding: 0 }}>

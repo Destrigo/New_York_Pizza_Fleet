@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useToast } from '@/components/Toast'
-import { roleLabel } from '@/lib/utils'
+import { roleLabel, exportCsv } from '@/lib/utils'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useUsers } from '@/hooks/useUsers'
 import { useLocations } from '@/hooks/useLocations'
@@ -12,6 +12,8 @@ export default function AdminUsers() {
   const { locations } = useLocations({})
   const [showInvite, setShowInvite] = useState(false)
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'manager' as Role, location_id: '' })
+  const [search, setSearch]         = useState('')
+  const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
 
   const deactivate = (_id: string, name: string) => {
     if (!confirm(`${name} deactiveren? De gebruiker kan daarna niet meer inloggen.`)) return
@@ -26,6 +28,10 @@ export default function AdminUsers() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
 
+  const filteredUsers = users
+    .filter((u) => filterRole === 'all' || u.role === filterRole)
+    .filter((u) => !search || u.full_name.toLowerCase().includes(search.toLowerCase()))
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -33,7 +39,19 @@ export default function AdminUsers() {
           <div className="htf-title">Gebruikersbeheer</div>
           <div className="htf-sub">Admin · Supervisor only · {users.length} gebruikers</div>
         </div>
-        <button className="btn btn-green" onClick={() => setShowInvite(true)}>+ Gebruiker uitnodigen</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => exportCsv(
+              filteredUsers.map((u) => {
+                const locName = MOCK_MODE ? locations.find((l) => l.id === u.location_id)?.name : u.location?.name
+                return { naam: u.full_name, rol: roleLabel[u.role], locatie: locName ?? u.location_id }
+              }),
+              `gebruikers-${new Date().toISOString().split('T')[0]}.csv`
+            )}
+          >↓ CSV</button>
+          <button className="btn btn-green" onClick={() => setShowInvite(true)}>+ Gebruiker uitnodigen</button>
+        </div>
       </div>
 
       {showInvite && (
@@ -71,6 +89,21 @@ export default function AdminUsers() {
         </div>
       )}
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        {(['all', 'manager', 'mechanic', 'driver', 'supervisor'] as const).map((r) => (
+          <button key={r} className={`btn btn-sm ${filterRole === r ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterRole(r)}>
+            {r === 'all' ? 'Alle rollen' : roleLabel[r as Role]}
+          </button>
+        ))}
+        <input
+          className="inp"
+          placeholder="Zoek naam…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ maxWidth: 200, height: 32, marginLeft: 'auto' }}
+        />
+      </div>
+
       <div className="htf-card" style={{ padding: 0 }}>
         <table className="data-table">
           <thead>
@@ -82,7 +115,7 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {filteredUsers.map((u) => {
               const locName = MOCK_MODE ? locations.find((l) => l.id === u.location_id)?.name : u.location?.name
               return (
                 <tr key={u.id}>
@@ -97,6 +130,9 @@ export default function AdminUsers() {
             })}
           </tbody>
         </table>
+        <div style={{ padding: '8px 12px', fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)' }}>
+          {filteredUsers.length} van {users.length} gebruikers
+        </div>
       </div>
     </div>
   )
