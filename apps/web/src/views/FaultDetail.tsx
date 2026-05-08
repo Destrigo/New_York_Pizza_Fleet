@@ -10,6 +10,8 @@ import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useFault } from '@/hooks/useFaults'
 import { useMessages } from '@/hooks/useMessages'
 import { useFaultPhotos } from '@/hooks/useFaultPhotos'
+import { useFaultEvents, STATUS_ICON } from '@/hooks/useFaultEvents'
+import { faultStatusLabel } from '@/lib/utils'
 import type { Fault } from '@/types'
 
 export default function FaultDetail() {
@@ -21,6 +23,7 @@ export default function FaultDetail() {
   const { fault, loading, setFault } = useFault(id)
   const { messages, send } = useMessages(id)
   const { photos } = useFaultPhotos(id)
+  const { events } = useFaultEvents(id)
 
   if (!user || !id) return null
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -132,6 +135,26 @@ export default function FaultDetail() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {isHub && events.length > 0 && (
+            <div className="htf-card" style={{ marginBottom: 16 }}>
+              <div className="lbl" style={{ marginBottom: 8 }}>Status tijdlijn</div>
+              <div style={{ display: 'flex', gap: 0, alignItems: 'center', flexWrap: 'wrap', rowGap: 6 }}>
+                {events.map((ev, i) => (
+                  <span key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {i > 0 && <span style={{ fontSize: 11, color: 'var(--muted)', margin: '0 4px' }}>→</span>}
+                    <span style={{ fontSize: 13 }}>{STATUS_ICON[ev.to_status]}</span>
+                    <span style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, letterSpacing: 0.5, color: 'var(--ink)' }}>
+                      {faultStatusLabel[ev.to_status]}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2 }}>
+                      {fmtDateTime(ev.created_at)}
+                    </span>
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 

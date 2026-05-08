@@ -147,6 +147,15 @@ export interface VehicleLog {
   performer?: User
 }
 
+export interface FaultEvent {
+  id: string
+  fault_id: string
+  from_status: FaultStatus | null
+  to_status: FaultStatus
+  changed_by: string | null
+  created_at: string
+}
+
 // Auth session shape (mirrors Supabase auth.users metadata)
 export interface AuthSession {
   user: User
