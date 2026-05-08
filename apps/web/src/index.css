@@ -305,6 +305,9 @@ html, body, #root {
 .grid-2 {
   display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
 }
+.grid-3 {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
 
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 700px) {
@@ -314,11 +317,19 @@ html, body, #root {
   .tab { padding: 10px 12px; font-size: 11px; }
   .htf-mobile-nav { display: flex; }
   .htf-shell { padding-bottom: 70px; }
-  /* Collapse 2-col grids to single column */
+  /* Collapse grids to single column */
   .grid-2 { grid-template-columns: 1fr; }
-  /* Hide non-essential nav items on small screens */
+  .grid-3 { grid-template-columns: 1fr; }
+  /* Hide non-essential nav items */
   .htf-nav .htf-role { display: none; }
-  /* Tighten table on mobile */
+  /* Tighten tables */
   .data-table th:nth-child(3),
   .data-table td:nth-child(3) { display: none; }
+  /* Kanban cards full width on mobile */
+  .sched-item { flex-wrap: wrap; }
+}
+
+@media (min-width: 701px) and (max-width: 1000px) {
+  /* Tablet: 3-col kanban becomes 2-col */
+  .grid-3 { grid-template-columns: 1fr 1fr; }
 }

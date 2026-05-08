@@ -12,6 +12,7 @@ import type { Fault, PickupSchedule } from '@/types'
 export default function HubDashboard() {
   const { user } = useAuth()
   const { faults: activeFaults, loading: fLoading } = useFaults({ status: ['open', 'in_progress', 'ready'] })
+  const { faults: closedToday } = useFaults({ status: ['closed'] })
   const { vehicles: hubVehicles, loading: vLoading } = useVehicles({ hubOnly: true })
   const { schedules, loading: sLoading } = useSchedules({})
 
@@ -23,6 +24,7 @@ export default function HubDashboard() {
   const ready      = activeFaults.filter((f) => f.status === 'ready').length
 
   const todayStr      = new Date().toISOString().split('T')[0]
+  const closedTodayCount = closedToday.filter((f) => f.closed_at?.startsWith(todayStr)).length
   const todaySchedule = schedules
     .filter((s) => s.scheduled_date === todayStr && s.status === 'planned')
     .slice(0, 4)
@@ -49,6 +51,7 @@ export default function HubDashboard() {
         <div className="htf-stat" style={{ borderTopColor: 'var(--gold)' }}><div className="htf-stat-n" style={{ color: 'var(--gold)' }}>{inProgress}</div><div className="htf-stat-l">In reparatie</div></div>
         <div className="htf-stat" style={{ borderTopColor: 'var(--green)' }}><div className="htf-stat-n" style={{ color: 'var(--green)' }}>{ready}</div><div className="htf-stat-l">Klaar voor ophaling</div></div>
         <div className="htf-stat" style={{ borderTopColor: 'var(--black)' }}><div className="htf-stat-n" style={{ color: 'var(--black)' }}>{hubVehicles.length}</div><div className="htf-stat-l">In Hub</div></div>
+        <div className="htf-stat" style={{ borderTopColor: 'var(--green)' }}><div className="htf-stat-n" style={{ color: 'var(--green)' }}>{closedTodayCount}</div><div className="htf-stat-l">Afgesloten vandaag</div></div>
       </div>
 
       <div className="grid-2">

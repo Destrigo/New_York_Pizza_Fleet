@@ -71,7 +71,7 @@ export default function HubQueue() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="grid-3">
         {STATUS_COLS.map((status) => (
           <div key={status}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
