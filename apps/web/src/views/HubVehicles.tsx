@@ -18,10 +18,13 @@ export default function HubVehicles() {
   const [selected, setSelected]     = useState<string[]>([])
   const [targetLoc, setTargetLoc]   = useState('')
   const [filterType, setFilterType] = useState<VehicleType | 'all'>('all')
+  const [search, setSearch]         = useState('')
 
   if (!user) return null
 
-  const filtered = filterType === 'all' ? vehicles : vehicles.filter((v) => v.type === filterType)
+  const filtered = vehicles
+    .filter((v) => filterType === 'all' || v.type === filterType)
+    .filter((v) => !search || v.id.toLowerCase().includes(search.toLowerCase()))
 
   const toggle = (id: string) =>
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
@@ -62,12 +65,19 @@ export default function HubVehicles() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         {(['all', 'ebike', 'scooter', 'car', 'bus'] as const).map((t) => (
           <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(t)}>
             {t === 'all' ? 'Alle' : vehicleTypeLabel[t]}
           </button>
         ))}
+        <input
+          className="inp"
+          placeholder="Zoek voertuig-ID…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ maxWidth: 180, height: 32, marginLeft: 'auto' }}
+        />
       </div>
 
       <div className="htf-card" style={{ padding: 0 }}>
