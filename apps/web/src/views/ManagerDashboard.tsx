@@ -14,10 +14,12 @@ export default function ManagerDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState<'dashboard' | 'faults' | 'ranking'>('dashboard')
+  const [visibleFaults, setVisibleFaults] = useState(15)
 
   const { faults: myFaults, loading: fLoading } = useFaults({ locationId: user?.location_id })
   const { vehicles: myVehicles, loading: vLoading } = useVehicles({ locationId: user?.location_id })
   const { schedules: hubVisits } = useSchedules({ fromLocationId: user?.location_id, status: ['completed'] })
+  const { schedules: upcomingPickups } = useSchedules({ fromLocationId: user?.location_id, status: ['planned'] })
   const { byFaults, byQuality } = useRanking()
 
   if (!user) return null
@@ -102,6 +104,36 @@ export default function ManagerDashboard() {
             )
           })()}
 
+          {upcomingPickups.length > 0 && (
+            <>
+              <div className="htf-sh" style={{ marginBottom: 8 }}>
+                <h2>Ophaalafspraken</h2>
+                <div className="htf-rule" />
+              </div>
+              <div className="htf-card" style={{ padding: 0, marginBottom: 20, borderTop: '3px solid var(--gold)' }}>
+                {upcomingPickups.map((s) => {
+                  const driverName = MOCK_MODE ? null : s.driver?.full_name
+                  return (
+                    <div key={s.id} style={{ display: 'flex', gap: 14, padding: '12px 16px', borderBottom: '1px solid #F5E6CC', alignItems: 'center' }}>
+                      <div style={{ fontSize: 24 }}>🚐</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>
+                          {fmtDate(s.scheduled_date)} · {s.time_from}–{s.time_to}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {s.vehicle_id}
+                          {driverName ? ` · Chauffeur: ${driverName}` : ''}
+                          {s.notes ? ` · ${s.notes}` : ''}
+                        </div>
+                      </div>
+                      <span className="badge badge-gold">Gepland</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
           <div className="htf-sh">
             <h2>Recente storingen</h2>
             <div className="htf-rule" />
@@ -145,6 +177,7 @@ export default function ManagerDashboard() {
                     kwaliteit: f.quality_score ?? '',
                     datum: fmtDateTime(f.created_at),
                     notities: f.notes ?? '',
+                    reparatie: f.repair_notes ?? '',
                   })),
                   `storingen-${loc?.name ?? 'locatie'}-${new Date().toISOString().split('T')[0]}.csv`
                 )}
@@ -158,31 +191,40 @@ export default function ManagerDashboard() {
               ✓ Geen storingen voor {loc?.name}
             </div>
           ) : (
-            myFaults.map((f) => (
-              <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', marginBottom: 12 }}>
-                <div className="htf-card" style={{ cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 22 }}>{getVehicleIcon(f.vehicle_id)}</span>
-                      <div>
-                        <div style={{ fontFamily: "'Playfair Display'", fontWeight: 700, fontSize: 17 }}>{f.vehicle_id}</div>
-                        <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)' }}>{fmtDateTime(f.created_at)}</div>
+            <>
+              {myFaults.slice(0, visibleFaults).map((f) => (
+                <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', marginBottom: 12 }}>
+                  <div className="htf-card" style={{ cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 22 }}>{getVehicleIcon(f.vehicle_id)}</span>
+                        <div>
+                          <div style={{ fontFamily: "'Playfair Display'", fontWeight: 700, fontSize: 17 }}>{f.vehicle_id}</div>
+                          <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--muted)' }}>{fmtDateTime(f.created_at)}</div>
+                        </div>
                       </div>
+                      <FaultBadge status={f.status} />
                     </div>
-                    <FaultBadge status={f.status} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13, marginBottom: f.notes ? 10 : 0 }}>
-                    <div><span className="lbl">Storing type</span>{f.fault_type}</div>
-                    <div><span className="lbl">Foto's</span>{f.photo_count} geüpload · ★ {f.quality_score?.toFixed(1)}</div>
-                  </div>
-                  {f.notes && (
-                    <div style={{ background: 'var(--cream)', border: '1px solid var(--bdr)', borderRadius: 3, padding: '6px 10px', fontSize: 13, fontStyle: 'italic', color: 'var(--muted)' }}>
-                      "{f.notes}"
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13, marginBottom: f.notes ? 10 : 0 }}>
+                      <div><span className="lbl">Storing type</span>{f.fault_type}</div>
+                      <div><span className="lbl">Foto's</span>{f.photo_count} geüpload · ★ {f.quality_score?.toFixed(1)}</div>
                     </div>
-                  )}
+                    {f.notes && (
+                      <div style={{ background: 'var(--cream)', border: '1px solid var(--bdr)', borderRadius: 3, padding: '6px 10px', fontSize: 13, fontStyle: 'italic', color: 'var(--muted)' }}>
+                        "{f.notes}"
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+              {visibleFaults < myFaults.length && (
+                <div style={{ textAlign: 'center', marginTop: 8 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setVisibleFaults((n) => n + 15)}>
+                    Meer laden ({myFaults.length - visibleFaults} resterend) →
+                  </button>
                 </div>
-              </Link>
-            ))
+              )}
+            </>
           )}
         </>
       )}

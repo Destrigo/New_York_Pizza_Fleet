@@ -64,6 +64,9 @@ inspector_port = 8083
 [functions.send-notification]
 verify_jwt = true
 
+[functions.admin-user]
+verify_jwt = true
+
 [analytics]
 enabled = false
 

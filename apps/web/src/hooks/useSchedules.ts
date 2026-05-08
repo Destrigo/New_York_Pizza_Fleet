@@ -7,6 +7,7 @@ interface Options {
   driverId?: string
   date?: string
   fromLocationId?: string
+  faultId?: string
   status?: PickupSchedule['status'][]
 }
 
@@ -22,6 +23,7 @@ export function useSchedules(opts: Options = {}) {
       if (opts.driverId)        data = data.filter((s) => s.driver_id === opts.driverId)
       if (opts.date)            data = data.filter((s) => s.scheduled_date === opts.date)
       if (opts.fromLocationId)  data = data.filter((s) => s.from_location_id === opts.fromLocationId)
+      if (opts.faultId)         data = data.filter((s) => s.fault_id === opts.faultId)
       if (opts.status)          data = data.filter((s) => opts.status!.includes(s.status))
       data.sort((a, b) => a.time_from.localeCompare(b.time_from))
       setSchedules(data)
@@ -37,10 +39,11 @@ export function useSchedules(opts: Options = {}) {
     if (opts.driverId)       q = q.eq('driver_id', opts.driverId)
     if (opts.date)           q = q.eq('scheduled_date', opts.date)
     if (opts.fromLocationId) q = q.eq('from_location_id', opts.fromLocationId)
+    if (opts.faultId)        q = q.eq('fault_id', opts.faultId)
     if (opts.status?.length) q = q.in('status', opts.status)
 
     q.then(({ data }) => { setSchedules(data ?? []); setLoading(false) })
-  }, [opts.driverId, opts.date, opts.fromLocationId, JSON.stringify(opts.status)])
+  }, [opts.driverId, opts.date, opts.fromLocationId, opts.faultId, JSON.stringify(opts.status)])
 
   useEffect(() => { load() }, [load])
 

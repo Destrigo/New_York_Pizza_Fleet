@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
-import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
-import { MOCK_LOC_MAP } from '@/lib/mock'
+import { fmtDate, fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
+import { MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import { useVehicles } from '@/hooks/useVehicles'
 import { useLocations } from '@/hooks/useLocations'
 import { useReserves } from '@/hooks/useReserves'
+import { useSchedules } from '@/hooks/useSchedules'
 import type { RankEntry } from '@/hooks/useRanking'
-import type { Fault, FaultStatus, Vehicle, VehicleType } from '@/types'
+import type { Fault, FaultStatus, PickupSchedule, Vehicle, VehicleType } from '@/types'
 
 type RankPeriod = 'month' | 'prev' | 'ytd'
 
@@ -18,16 +19,18 @@ const STATUS_ORDER: FaultStatus[] = ['open', 'in_progress', 'ready', 'closed']
 
 export default function SupervisorDashboard() {
   const { user } = useAuth()
-  const [tab, setTab]           = useState<'overview' | 'faults' | 'ranking' | 'locations'>('overview')
+  const [tab, setTab]           = useState<'overview' | 'faults' | 'ranking' | 'locations' | 'planning'>('overview')
   const [rankPeriod, setRankPeriod] = useState<RankPeriod>('month')
   const [drillLoc, setDrillLoc] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<FaultStatus | 'all'>('all')
   const [search, setSearch] = useState('')
+  const [visibleFaults, setVisibleFaults] = useState(20)
 
   const { faults: allFaults, loading: fLoading } = useFaults()
   const { vehicles: allVehicles, loading: vLoading } = useVehicles()
   const { locations: nonHubLocations } = useLocations({ excludeHub: true })
   const { reserves } = useReserves()
+  const { schedules: allSchedules } = useSchedules({})
 
   if (!user) return null
   if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -124,9 +127,9 @@ export default function SupervisorDashboard() {
       <div className="htf-sub">{user.full_name} · Overzicht alle locaties</div>
 
       <div className="tabs">
-        {(['overview', 'faults', 'ranking', 'locations'] as const).map((t) => (
+        {(['overview', 'faults', 'ranking', 'locations', 'planning'] as const).map((t) => (
           <button key={t} className={`tab ${tab === t ? 'tab-on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? 'Overzicht' : t === 'faults' ? 'Storingen' : t === 'ranking' ? 'Ranking' : 'Locaties'}
+            {t === 'overview' ? 'Overzicht' : t === 'faults' ? 'Storingen' : t === 'ranking' ? 'Ranking' : t === 'locations' ? 'Locaties' : 'Planning'}
           </button>
         ))}
       </div>
@@ -242,14 +245,14 @@ export default function SupervisorDashboard() {
               className="inp"
               placeholder="Zoek op voertuig, type, locatie…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setVisibleFaults(20) }}
               style={{ maxWidth: 240, height: 32 }}
             />
             {(['all', 'open', 'in_progress', 'ready', 'closed'] as const).map((s) => (
               <button
                 key={s}
                 className={`btn btn-sm ${filterStatus === s ? 'btn-red' : 'btn-muted'}`}
-                onClick={() => setFilterStatus(s)}
+                onClick={() => { setFilterStatus(s); setVisibleFaults(20) }}
               >
                 {s === 'all' ? 'Alle' : s === 'open' ? 'Storing' : s === 'in_progress' ? 'Start Fix' : s === 'ready' ? 'Klaar' : 'Gesloten'}
               </button>
@@ -268,6 +271,7 @@ export default function SupervisorDashboard() {
                   kwaliteit: f.quality_score ?? '',
                   datum: fmtDateTime(f.created_at),
                   notities: f.notes ?? '',
+                  reparatie: f.repair_notes ?? '',
                 })),
                 `storingen-${new Date().toISOString().split('T')[0]}.csv`
               )}
@@ -278,7 +282,7 @@ export default function SupervisorDashboard() {
           <div className="htf-card" style={{ padding: 0 }}>
             {filteredFaults.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Geen storingen gevonden.</div>
-            ) : filteredFaults.map((f) => (
+            ) : filteredFaults.slice(0, visibleFaults).map((f) => (
               <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="fault-row">
                   <div className="v-icon">{getFaultVehicleIcon(f)}</div>
@@ -293,6 +297,13 @@ export default function SupervisorDashboard() {
               </Link>
             ))}
           </div>
+          {visibleFaults < filteredFaults.length && (
+            <div style={{ textAlign: 'center', marginTop: 10 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setVisibleFaults((n) => n + 20)}>
+                Meer laden ({filteredFaults.length - visibleFaults} resterend) →
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -421,6 +432,87 @@ export default function SupervisorDashboard() {
           )}
         </>
       )}
+      {/* ── PLANNING ── */}
+      {tab === 'planning' && (() => {
+        const grouped = allSchedules.reduce((acc, s) => {
+          if (!acc[s.scheduled_date]) acc[s.scheduled_date] = []
+          acc[s.scheduled_date].push(s)
+          return acc
+        }, {} as Record<string, PickupSchedule[]>)
+
+        const getSchedDriverName = (s: PickupSchedule) =>
+          MOCK_MODE ? (MOCK_USERS_MAP[s.driver_id]?.full_name ?? s.driver_id) : (s.driver?.full_name ?? s.driver_id)
+        const getSchedFromName = (s: PickupSchedule) =>
+          MOCK_MODE ? (MOCK_LOC_MAP[s.from_location_id]?.name ?? s.from_location_id) : (s.from_location?.name ?? s.from_location_id)
+        const getSchedToName = (s: PickupSchedule) =>
+          MOCK_MODE ? (MOCK_LOC_MAP[s.to_location_id]?.name ?? s.to_location_id) : (s.to_location?.name ?? s.to_location_id)
+
+        return (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+              <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, color: 'var(--muted)', letterSpacing: 1 }}>
+                {allSchedules.filter((s) => s.status === 'planned').length} gepland · {allSchedules.filter((s) => s.status === 'completed').length} voltooid
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => exportCsv(
+                  allSchedules.map((s) => ({
+                    datum: s.scheduled_date,
+                    van: getSchedFromName(s),
+                    naar: getSchedToName(s),
+                    voertuig: s.vehicle_id,
+                    chauffeur: getSchedDriverName(s),
+                    tijd: `${s.time_from}–${s.time_to}`,
+                    status: s.status,
+                    notities: s.notes ?? '',
+                  })),
+                  `planning-${new Date().toISOString().split('T')[0]}.csv`
+                )}
+              >
+                ↓ CSV
+              </button>
+            </div>
+
+            {Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a)).map(([date, items]) => (
+              <div key={date} style={{ marginBottom: 24 }}>
+                <div className="htf-sh">
+                  <h2>{fmtDate(date)}</h2>
+                  <div className="htf-rule" />
+                  <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, color: 'var(--muted)', letterSpacing: 1 }}>
+                    {items.filter((s) => s.status === 'planned').length} gepland · {items.filter((s) => s.status === 'completed').length} voltooid
+                  </div>
+                </div>
+                <div className="htf-card" style={{ padding: 0 }}>
+                  {items.map((s) => (
+                    <div key={s.id} style={{ display: 'flex', gap: 14, padding: '12px 16px', borderBottom: '1px solid #F5E6CC', alignItems: 'center', opacity: s.status === 'cancelled' ? 0.5 : 1 }}>
+                      <div style={{ minWidth: 70, fontFamily: "'Barlow Condensed'", fontSize: 13, color: 'var(--muted)', letterSpacing: 0.5 }}>
+                        {s.time_from}<br />{s.time_to}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{s.vehicle_id}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {getSchedFromName(s)} → {getSchedToName(s)} · {getSchedDriverName(s)}
+                        </div>
+                        {s.notes && <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic', marginTop: 2 }}>{s.notes}</div>}
+                      </div>
+                      <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
+                        {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {Object.keys(grouped).length === 0 && (
+              <div className="htf-card" style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
+                Geen ophaalafspraken gevonden.
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }

@@ -7,6 +7,21 @@ import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
 import type { Fault, FaultStatus } from '@/types'
 
+function slaAge(createdAt: string): string {
+  const hours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000
+  if (hours < 1) return `${Math.round(hours * 60)}m`
+  if (hours < 24) return `${hours.toFixed(0)}u`
+  return `${(hours / 24).toFixed(1)}d`
+}
+
+function slaColor(createdAt: string, status: FaultStatus): string {
+  const hours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000
+  if (status === 'open' && hours > 4) return 'var(--red)'
+  if (status === 'in_progress' && hours > 24) return 'var(--red)'
+  if (hours > 8) return 'var(--gold)'
+  return 'var(--muted)'
+}
+
 const STATUS_COLS: FaultStatus[] = ['open', 'in_progress', 'ready']
 
 const colColor: Record<FaultStatus, string> = {
@@ -103,8 +118,20 @@ export default function HubQueue() {
                       </div>
                     </div>
                     <div style={{ fontSize: 12, marginBottom: 6 }}>{f.fault_type}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", marginBottom: 10 }}>
-                      {fmtDateTime(f.created_at)} · {f.photo_count} foto's
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'Barlow Condensed'" }}>
+                        {fmtDateTime(f.created_at)} · {f.photo_count} foto's
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {f.quality_score != null && (
+                          <span style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 0.5, color: 'var(--gold)' }}>
+                            ★ {f.quality_score.toFixed(1)}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 0.5, color: slaColor(f.created_at, f.status), fontWeight: 700 }}>
+                          ⏱ {slaAge(f.created_at)}
+                        </span>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <Link to={`/faults/${f.id}`} className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center' }}>

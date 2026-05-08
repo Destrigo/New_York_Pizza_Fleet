@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { ToastProvider } from '@/components/Toast'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import InstallBanner from '@/components/InstallBanner'
 
 // Views
 import Login from '@/views/Login'
@@ -43,6 +44,7 @@ function HomeRedirect() {
 export default function App() {
   return (
     <ToastProvider>
+      <InstallBanner />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/unauthorized" element={<Unauthorized />} />

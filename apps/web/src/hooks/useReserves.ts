@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Reserve, VehicleType } from '@/types'
 import { supabase, MOCK_MODE } from '@/lib/supabase'
 import { MOCK_LOCATIONS } from '@/lib/mock'
@@ -13,7 +13,7 @@ export function useReserves() {
   const [reserves, setReserves] = useState<Reserve[]>([])
   const [loading, setLoading]   = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (MOCK_MODE) {
       const locs = MOCK_LOCATIONS.filter((l) => !l.is_hub)
       const data: Reserve[] = locs.flatMap((l) =>
@@ -30,13 +30,24 @@ export function useReserves() {
       setLoading(false)
       return
     }
-
-    supabase!
+    const { data } = await supabase!
       .from('reserves')
       .select('*, location:locations(*)')
       .order('location_id')
-      .then(({ data }) => { setReserves(data ?? []); setLoading(false) })
+    setReserves(data ?? [])
+    setLoading(false)
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (MOCK_MODE) return
+    const channel = supabase!
+      .channel('reserves-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reserves' }, () => { load() })
+      .subscribe()
+    return () => { supabase!.removeChannel(channel) }
+  }, [load])
 
   const upsert = async (locationId: string, vehicleType: VehicleType, targetCount: number, updatedBy: string) => {
     if (MOCK_MODE) {

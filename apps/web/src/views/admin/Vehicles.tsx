@@ -20,6 +20,8 @@ export default function AdminVehicles() {
   const [search, setSearch]             = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ id: '', type: 'ebike', location_id: '' })
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ color: '', notes: '' })
 
   if (!user) return null
 
@@ -38,6 +40,25 @@ export default function AdminVehicles() {
     }
     setShowAdd(false)
     setForm({ id: '', type: 'ebike', location_id: '' })
+  }
+
+  const openEdit = (v: { id: string; color: string | null; notes: string | null }) => {
+    setEditId(v.id)
+    setEditForm({ color: v.color ?? '', notes: v.notes ?? '' })
+  }
+
+  const saveEdit = async () => {
+    if (!editId) return
+    if (MOCK_MODE) {
+      toast(`${editId} bijgewerkt (demo).`)
+    } else {
+      await supabase!.from('vehicles').update({
+        color: editForm.color || null,
+        notes: editForm.notes || null,
+      }).eq('id', editId)
+      toast(`${editId} bijgewerkt.`)
+    }
+    setEditId(null)
   }
 
   const retireVehicle = async (vehicleId: string) => {
@@ -100,6 +121,26 @@ export default function AdminVehicles() {
         </div>
       )}
 
+      {editId && (
+        <div className="htf-card" style={{ marginBottom: 16, borderTop: '3px solid var(--gold)' }}>
+          <div className="htf-sh"><h2>Bewerk {editId}</h2><div className="htf-rule" /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div className="field">
+              <label className="lbl">Kleur <span style={{ color: 'var(--muted)' }}>(optioneel)</span></label>
+              <input className="inp" value={editForm.color} placeholder="bv. Rood, #C41E1E" onChange={(e) => setEditForm((p) => ({ ...p, color: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label className="lbl">Notities <span style={{ color: 'var(--muted)' }}>(optioneel)</span></label>
+              <input className="inp" value={editForm.notes} placeholder="Interne notitie…" onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-green btn-sm" onClick={saveEdit}>Opslaan</button>
+            <button className="btn btn-muted btn-sm" onClick={() => setEditId(null)}>Annuleren</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         {(['all', 'ebike', 'scooter', 'car', 'bus'] as const).map((t) => (
           <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(t)}>
@@ -146,9 +187,10 @@ export default function AdminVehicles() {
                   <td style={{ fontSize: 13 }}>{locName}</td>
                   <td><VehicleBadge status={v.status} /></td>
                   <td>
-                    <button className="btn btn-muted btn-sm" onClick={() => retireVehicle(v.id)}>
-                      Pensioneren
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openEdit(v)}>Bewerken</button>
+                      <button className="btn btn-muted btn-sm" onClick={() => retireVehicle(v.id)}>Pensioneren</button>
+                    </div>
                   </td>
                 </tr>
               )

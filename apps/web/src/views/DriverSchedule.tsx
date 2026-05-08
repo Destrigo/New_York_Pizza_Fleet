@@ -5,6 +5,7 @@ import { fmtDate } from '@/lib/utils'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useSchedules } from '@/hooks/useSchedules'
+import type { Location } from '@/types'
 
 export default function DriverSchedule() {
   const { user } = useAuth()
@@ -20,7 +21,7 @@ export default function DriverSchedule() {
 
   const myItems = schedules.filter((s) => s.status !== 'cancelled')
 
-  const getLoc = (locId: string, joined?: { name: string } | null) =>
+  const getLoc = (locId: string, joined?: Location | null) =>
     MOCK_MODE ? MOCK_LOC_MAP[locId] : joined
 
   return (
@@ -93,6 +94,16 @@ export default function DriverSchedule() {
                     <strong>{s.vehicle_id}</strong>
                     {from?.name?.includes('Hub') ? ' — Afleveren' : ' — Ophalen'}
                   </div>
+                  {from?.address && (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(from.address + ', ' + (from.city ?? ''))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: 'var(--red)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5, textDecoration: 'none', display: 'inline-block', marginBottom: 4 }}
+                    >
+                      📍 {from.address} →
+                    </a>
+                  )}
                   {s.notes && (
                     <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>
                       📝 {s.notes}

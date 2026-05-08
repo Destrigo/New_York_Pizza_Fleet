@@ -86,37 +86,37 @@ export const MOCK_VEHICLES: Vehicle[] = [
 export const MOCK_FAULTS: Fault[] = [
   {
     id: 'f1', vehicle_id: 'F-001', location_id: 'bilderdijk', reported_by: 'ayoub',
-    fault_type: 'Lekke band', notes: 'Voorband volledig plat, ochtend eerste rit.',
+    fault_type: 'Lekke band', notes: 'Voorband volledig plat, ochtend eerste rit.', repair_notes: null,
     status: 'open', photo_count: 2, quality_score: 5.5,
     created_at: '2026-04-25T08:14:00Z', updated_at: '2026-04-25T08:14:00Z', closed_at: null,
   },
   {
     id: 'f2', vehicle_id: 'S-002', location_id: 'bilderdijk', reported_by: 'ayoub',
-    fault_type: 'Elektrische aandrijving', notes: 'Motor valt uit op lage snelheid.',
+    fault_type: 'Elektrische aandrijving', notes: 'Motor valt uit op lage snelheid.', repair_notes: null,
     status: 'in_progress', photo_count: 3, quality_score: 6.0,
     created_at: '2026-04-24T17:33:00Z', updated_at: '2026-04-25T09:00:00Z', closed_at: null,
   },
   {
     id: 'f3', vehicle_id: 'F-011', location_id: 'pieter', reported_by: 'nadir',
-    fault_type: 'Sleutel kwijt', notes: '',
+    fault_type: 'Sleutel kwijt', notes: '', repair_notes: null,
     status: 'open', photo_count: 2, quality_score: 4.0,
     created_at: '2026-04-26T09:01:00Z', updated_at: '2026-04-26T09:01:00Z', closed_at: null,
   },
   {
     id: 'f4', vehicle_id: 'F-021', location_id: 'linnaeus', reported_by: 'bryan',
-    fault_type: 'Spaken', notes: 'Meerdere gebroken spaken op achterwiel.',
+    fault_type: 'Spaken', notes: 'Meerdere gebroken spaken op achterwiel.', repair_notes: 'Alle gebroken spaken vervangen, wiel gecentreerd.',
     status: 'ready', photo_count: 4, quality_score: 7.0,
     created_at: '2026-04-23T11:20:00Z', updated_at: '2026-04-26T10:00:00Z', closed_at: null,
   },
   {
     id: 'f5', vehicle_id: 'A-002', location_id: 'hub-hfd', reported_by: 'karim',
-    fault_type: 'Lekke band', notes: 'Achterrechter band lek.',
+    fault_type: 'Lekke band', notes: 'Achterrechter band lek.', repair_notes: null,
     status: 'open', photo_count: 2, quality_score: 5.0,
     created_at: '2026-04-26T07:45:00Z', updated_at: '2026-04-26T07:45:00Z', closed_at: null,
   },
   {
     id: 'f6', vehicle_id: 'F-040', location_id: 'molenwijk', reported_by: 'alex',
-    fault_type: 'Pizza Box houder', notes: 'Houder volledig losgeraakt.',
+    fault_type: 'Pizza Box houder', notes: 'Houder volledig losgeraakt.', repair_notes: null,
     status: 'open', photo_count: 2, quality_score: 5.0,
     created_at: '2026-04-26T10:22:00Z', updated_at: '2026-04-26T10:22:00Z', closed_at: null,
   },

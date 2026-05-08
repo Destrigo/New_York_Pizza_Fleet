@@ -49,8 +49,9 @@ export default function Nav() {
         )}
         {user.role === 'supervisor' && (
           <>
-            <Link to="/hub/queue"   className="htf-nav-btn" style={{ opacity: isActive('/hub/queue') ? 1 : 0.7 }}>Queue</Link>
-            <Link to="/admin/users" className="htf-nav-btn" style={{ opacity: isActive('/admin') ? 1 : 0.7 }}>Admin</Link>
+            <Link to="/hub/queue"    className="htf-nav-btn" style={{ opacity: isActive('/hub/queue') ? 1 : 0.7 }}>Queue</Link>
+            <Link to="/hub/schedule" className="htf-nav-btn" style={{ opacity: isActive('/hub/schedule') ? 1 : 0.7 }}>Planning</Link>
+            <Link to="/admin/users"  className="htf-nav-btn" style={{ opacity: isActive('/admin') ? 1 : 0.7 }}>Admin</Link>
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useToast } from '@/components/Toast'
 import { roleLabel, exportCsv } from '@/lib/utils'
-import { MOCK_MODE } from '@/lib/supabase'
+import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useUsers } from '@/hooks/useUsers'
 import { useLocations } from '@/hooks/useLocations'
 import type { Role } from '@/types'
@@ -12,15 +12,45 @@ export default function AdminUsers() {
   const { locations } = useLocations({})
   const [showInvite, setShowInvite] = useState(false)
   const [invite, setInvite] = useState({ email: '', full_name: '', role: 'manager' as Role, location_id: '' })
+  const [inviting, setInviting]     = useState(false)
   const [search, setSearch]         = useState('')
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
 
-  const deactivate = (_id: string, name: string) => {
+  const deactivate = async (id: string, name: string) => {
     if (!confirm(`${name} deactiveren? De gebruiker kan daarna niet meer inloggen.`)) return
-    toast('Gebruiker gedeactiveerd' + (MOCK_MODE ? ' (demo: niet persistent).' : '.'))
+    if (MOCK_MODE) {
+      toast('Gebruiker gedeactiveerd (demo: niet persistent).')
+      return
+    }
+    const { error } = await supabase!.functions.invoke('admin-user', {
+      body: { action: 'deactivate', user_id: id },
+    })
+    if (error) { toast('Deactiveren mislukt.', 'error'); return }
+    toast(`${name} gedeactiveerd.`)
   }
 
-  const sendInvite = () => {
+  const sendInvite = async () => {
+    if (!invite.email || !invite.full_name) return
+    setInviting(true)
+    if (MOCK_MODE) {
+      await new Promise((r) => setTimeout(r, 600))
+      toast(`Uitnodiging verstuurd naar ${invite.email} (demo).`)
+      setShowInvite(false)
+      setInvite({ email: '', full_name: '', role: 'manager', location_id: '' })
+      setInviting(false)
+      return
+    }
+    const { error } = await supabase!.functions.invoke('admin-user', {
+      body: {
+        action: 'invite',
+        email: invite.email,
+        full_name: invite.full_name,
+        role: invite.role,
+        location_id: invite.location_id || null,
+      },
+    })
+    setInviting(false)
+    if (error) { toast('Uitnodigen mislukt: ' + error.message, 'error'); return }
     toast(`Uitnodiging verstuurd naar ${invite.email}.`)
     setShowInvite(false)
     setInvite({ email: '', full_name: '', role: 'manager', location_id: '' })
@@ -44,8 +74,8 @@ export default function AdminUsers() {
             className="btn btn-ghost btn-sm"
             onClick={() => exportCsv(
               filteredUsers.map((u) => {
-                const locName = MOCK_MODE ? locations.find((l) => l.id === u.location_id)?.name : u.location?.name
-                return { naam: u.full_name, rol: roleLabel[u.role], locatie: locName ?? u.location_id }
+                const locName = u.location?.name ?? u.location_id
+                return { naam: u.full_name, rol: roleLabel[u.role], locatie: locName }
               }),
               `gebruikers-${new Date().toISOString().split('T')[0]}.csv`
             )}
@@ -75,16 +105,23 @@ export default function AdminUsers() {
               </select>
             </div>
             <div className="field">
-              <label className="lbl">Locatie</label>
+              <label className="lbl">Locatie <span style={{ color: 'var(--muted)' }}>(optioneel voor hub-rollen)</span></label>
               <select className="sel" value={invite.location_id} onChange={(e) => setInvite((p) => ({ ...p, location_id: e.target.value }))}>
                 <option value="">— Kies locatie —</option>
                 {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-green" onClick={sendInvite} disabled={!invite.email || !invite.full_name}>Uitnodiging sturen →</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button className="btn btn-green" onClick={sendInvite} disabled={!invite.email || !invite.full_name || inviting}>
+              {inviting ? 'Versturen…' : 'Uitnodiging sturen →'}
+            </button>
             <button className="btn btn-muted" onClick={() => setShowInvite(false)}>Annuleren</button>
+            {!MOCK_MODE && (
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
+                Gebruiker ontvangt een e-mail om een wachtwoord in te stellen.
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -116,12 +153,12 @@ export default function AdminUsers() {
           </thead>
           <tbody>
             {filteredUsers.map((u) => {
-              const locName = MOCK_MODE ? locations.find((l) => l.id === u.location_id)?.name : u.location?.name
+              const locName = u.location?.name ?? u.location_id
               return (
                 <tr key={u.id}>
                   <td style={{ fontWeight: 600 }}>{u.full_name}</td>
                   <td><span className="badge badge-muted">{roleLabel[u.role]}</span></td>
-                  <td style={{ fontSize: 13 }}>{locName ?? u.location_id}</td>
+                  <td style={{ fontSize: 13 }}>{locName ?? '—'}</td>
                   <td>
                     <button className="btn btn-muted btn-sm" onClick={() => deactivate(u.id, u.full_name)}>Deactiveren</button>
                   </td>

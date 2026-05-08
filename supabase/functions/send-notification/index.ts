@@ -1,6 +1,6 @@
 // Supabase Edge Function: send-notification
 // Triggered by Supabase webhooks on DB changes.
-// Sends push (FCM) + email (Resend) + writes to notifications table.
+// Sends push (FCM HTTP v1) + email (Resend) + writes to notifications table.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -18,22 +18,90 @@ interface NotificationPayload {
   related_pickup_id?: string
 }
 
-async function sendFCM(fcmToken: string, title: string, body: string) {
-  const vapidKey = Deno.env.get('FCM_SERVER_KEY')
-  if (!vapidKey || !fcmToken) return
+// ── FCM HTTP v1 via service account JWT ─────────────────────────────────────
 
-  await fetch('https://fcm.googleapis.com/fcm/send', {
+interface ServiceAccount {
+  project_id: string
+  client_email: string
+  private_key: string
+}
+
+let _cachedToken: { token: string; exp: number } | null = null
+
+async function getFcmAccessToken(sa: ServiceAccount): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  if (_cachedToken && _cachedToken.exp > now + 60) return _cachedToken.token
+
+  const header  = { alg: 'RS256', typ: 'JWT' }
+  const payload = {
+    iss:  sa.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud:  'https://oauth2.googleapis.com/token',
+    exp:  now + 3600,
+    iat:  now,
+  }
+
+  const enc   = new TextEncoder()
+  const b64u  = (s: string) => btoa(s).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const hdr64 = b64u(JSON.stringify(header))
+  const pld64 = b64u(JSON.stringify(payload))
+  const input = `${hdr64}.${pld64}`
+
+  const pemBody   = sa.private_key.replace(/-----[^-]+-----/g, '').replace(/\s/g, '')
+  const keyBuffer = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0))
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', keyBuffer.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  )
+  const sig    = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, enc.encode(input))
+  const sig64  = b64u(String.fromCharCode(...new Uint8Array(sig)))
+  const jwt    = `${input}.${sig64}`
+
+  const res  = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${vapidKey}`,
-    },
-    body: JSON.stringify({
-      to: fcmToken,
-      notification: { title, body },
-      webpush: { notification: { icon: '/logo192.png' } },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion:  jwt,
     }),
   })
+  const { access_token, expires_in } = await res.json()
+  _cachedToken = { token: access_token, exp: now + (expires_in ?? 3600) }
+  return access_token
+}
+
+async function sendFCM(fcmToken: string, title: string, body: string) {
+  const saJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON')
+  if (!saJson || !fcmToken) return
+
+  try {
+    const sa: ServiceAccount = JSON.parse(saJson)
+    const accessToken = await getFcmAccessToken(sa)
+
+    await fetch(
+      `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          message: {
+            token: fcmToken,
+            notification: { title, body },
+            webpush: {
+              notification: { icon: '/icon-192.png', badge: '/badge-72.png' },
+              fcm_options: { link: '/' },
+            },
+          },
+        }),
+      }
+    )
+  } catch (e) {
+    console.error('FCM error:', e)
+  }
 }
 
 async function sendEmail(email: string, subject: string, html: string) {
@@ -64,7 +132,7 @@ async function notify(payload: NotificationPayload) {
     sent_at: new Date().toISOString(),
   })
 
-  // Get recipient's fcm_token, last_seen and email
+  // Get recipient's fcm_token and last_seen
   const { data: user } = await supabase
     .from('users')
     .select('fcm_token, last_seen')
@@ -112,7 +180,6 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Confirmation to reporting manager
       await notify({
         recipient_id: fault.reported_by,
         type: 'fault_received',
@@ -128,7 +195,6 @@ Deno.serve(async (req) => {
       const old = event.old_record
 
       if (fault.status === 'in_progress' && old?.status !== 'in_progress') {
-        // Start Fix — notify supervisors
         const { data: supervisors } = await supabase.from('users').select('id').eq('role', 'supervisor')
         for (const sup of supervisors ?? []) {
           await notify({
@@ -142,24 +208,38 @@ Deno.serve(async (req) => {
       }
 
       if (fault.status === 'ready' && old?.status !== 'ready') {
-        // Ready — notify supervisors + reporting manager
         const { data: supervisors } = await supabase.from('users').select('id').eq('role', 'supervisor')
         for (const sup of supervisors ?? []) {
           await notify({
             recipient_id: sup.id,
             type: 'fault_update',
             title: `${fault.vehicle_id} — Klaar voor ophaling`,
-            body: `Voertuig ${fault.vehicle_id} is gerepareerd en klaar voor ophaling.`,
+            body: `Voertuig ${fault.vehicle_id} is gerepareerd en klaar voor ophaling.${fault.repair_notes ? ` Notitie: ${fault.repair_notes}` : ''}`,
             related_fault_id: fault.id,
           })
         }
+        const repairSuffix = fault.repair_notes ? ` Reparatie: ${fault.repair_notes}` : ''
         await notify({
           recipient_id: fault.reported_by,
           type: 'fault_update',
           title: `${fault.vehicle_id} — Klaar`,
-          body: `Je voertuig ${fault.vehicle_id} is gerepareerd en wordt binnenkort afgeleverd.`,
+          body: `Je voertuig ${fault.vehicle_id} is gerepareerd en wordt binnenkort afgeleverd.${repairSuffix}`,
           related_fault_id: fault.id,
         })
+      }
+
+      if (fault.status === 'open' && old?.status === 'closed') {
+        // Fault reopened — notify hub
+        const { data: mechanics } = await supabase.from('users').select('id').eq('role', 'mechanic')
+        for (const m of mechanics ?? []) {
+          await notify({
+            recipient_id: m.id,
+            type: 'fault_update',
+            title: `${fault.vehicle_id} — Heropend`,
+            body: `Storing voor ${fault.vehicle_id} is heropend en staat weer in de queue.`,
+            related_fault_id: fault.id,
+          })
+        }
       }
     }
 
@@ -168,7 +248,6 @@ Deno.serve(async (req) => {
       const schedule = record
       const { data: loc } = await supabase.from('locations').select('name').eq('id', schedule.from_location_id).single()
 
-      // Notify driver
       await notify({
         recipient_id: schedule.driver_id,
         type: 'pickup',
@@ -177,8 +256,6 @@ Deno.serve(async (req) => {
         related_pickup_id: schedule.id,
       })
 
-      // Notify location manager(s): via linked fault's reporter if available,
-      // otherwise notify all managers at the from_location directly.
       const managerIds: string[] = []
       if (schedule.fault_id) {
         const { data: fault } = await supabase.from('faults').select('reported_by').eq('id', schedule.fault_id).single()
@@ -198,7 +275,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── PICKUP SCHEDULE COMPLETE: notify destination managers ───────────────
+    // ── PICKUP SCHEDULE COMPLETE/CANCEL ─────────────────────────────────────
     if (table === 'pickup_schedules' && type === 'UPDATE') {
       const schedule = record
       const old = event.old_record
@@ -207,7 +284,6 @@ Deno.serve(async (req) => {
         const { data: toLoc } = await supabase
           .from('locations').select('name, is_hub').eq('id', schedule.to_location_id).single()
 
-        // Only notify when delivering to a regular location (not when picking up to Hub)
         if (toLoc && !toLoc.is_hub) {
           const { data: managers } = await supabase
             .from('users').select('id').eq('role', 'manager').eq('location_id', schedule.to_location_id)
@@ -223,6 +299,37 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      if (schedule.status === 'cancelled' && old?.status !== 'cancelled') {
+        const { data: fromLoc } = await supabase
+          .from('locations').select('name').eq('id', schedule.from_location_id).single()
+
+        await notify({
+          recipient_id: schedule.driver_id,
+          type: 'pickup',
+          title: 'Ophaalmoment geannuleerd',
+          body: `Het ophaalmoment voor ${schedule.vehicle_id} bij ${fromLoc?.name ?? 'onbekende locatie'} op ${schedule.scheduled_date} is geannuleerd.`,
+          related_pickup_id: schedule.id,
+        })
+
+        const managerIds: string[] = []
+        if (schedule.fault_id) {
+          const { data: fault } = await supabase.from('faults').select('reported_by').eq('id', schedule.fault_id).single()
+          if (fault?.reported_by) managerIds.push(fault.reported_by)
+        } else {
+          const { data: managers } = await supabase.from('users').select('id').eq('role', 'manager').eq('location_id', schedule.from_location_id)
+          for (const m of managers ?? []) managerIds.push(m.id)
+        }
+        for (const managerId of managerIds) {
+          await notify({
+            recipient_id: managerId,
+            type: 'pickup',
+            title: 'Ophaalmoment geannuleerd',
+            body: `Het geplande ophaalmoment voor ${schedule.vehicle_id} op ${schedule.scheduled_date} is helaas geannuleerd. We nemen zo snel mogelijk contact op.`,
+            related_pickup_id: schedule.id,
+          })
+        }
+      }
     }
 
     // ── CHAT MESSAGE INSERT: notify other party ─────────────────────────────
@@ -232,7 +339,6 @@ Deno.serve(async (req) => {
       const { data: sender } = await supabase.from('users').select('full_name').eq('id', msg.sender_id).single()
 
       if (msg.is_hub_side && fault?.reported_by) {
-        // Hub → manager
         await notify({
           recipient_id: fault.reported_by,
           type: 'chat',
@@ -241,7 +347,6 @@ Deno.serve(async (req) => {
           related_fault_id: msg.fault_id,
         })
       } else if (!msg.is_hub_side && fault?.location_id) {
-        // Manager → Hub: notify all hub mechanics
         const { data: mechanics } = await supabase.from('users').select('id').eq('role', 'mechanic')
         for (const m of mechanics ?? []) {
           await notify({

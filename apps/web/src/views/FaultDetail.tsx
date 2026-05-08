@@ -4,26 +4,28 @@ import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/components/Toast'
 import { FaultBadge } from '@/components/StatusBadge'
 import ChatPanel from '@/components/ChatPanel'
-import { fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, printChatThread } from '@/lib/utils'
+import { fmtDate, fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, printChatThread, faultStatusLabel } from '@/lib/utils'
 import { MOCK_VEHICLES, MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { useFault } from '@/hooks/useFaults'
 import { useMessages } from '@/hooks/useMessages'
 import { useFaultPhotos } from '@/hooks/useFaultPhotos'
 import { useFaultEvents, STATUS_ICON } from '@/hooks/useFaultEvents'
-import { faultStatusLabel } from '@/lib/utils'
+import { useSchedules } from '@/hooks/useSchedules'
 import type { Fault } from '@/types'
 
 export default function FaultDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const toast = useToast()
-  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [lightbox, setLightbox]       = useState<string | null>(null)
+  const [repairInput, setRepairInput] = useState<string | null>(null)
 
   const { fault, loading, setFault } = useFault(id)
   const { messages, send } = useMessages(id)
   const { photos } = useFaultPhotos(id)
   const { events } = useFaultEvents(id)
+  const { schedules: linkedSchedules } = useSchedules({ faultId: id })
 
   if (!user || !id) return null
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
@@ -40,13 +42,16 @@ export default function FaultDetail() {
     })
   }
 
-  const updateStatus = async (status: Fault['status']) => {
-    setFault((prev) => prev ? { ...prev, status } : prev)
+  const updateStatus = async (status: Fault['status'], repairNotes?: string) => {
+    const patch: Partial<Fault> = { status }
+    if (repairNotes !== undefined) patch.repair_notes = repairNotes
+    setFault((prev) => prev ? { ...prev, ...patch } : prev)
+    setRepairInput(null)
     if (MOCK_MODE) {
       toast(`Status bijgewerkt naar: ${status}`)
       return
     }
-    await supabase!.from('faults').update({ status }).eq('id', fault.id)
+    await supabase!.from('faults').update(patch).eq('id', fault.id)
     toast('Status bijgewerkt.')
   }
 
@@ -101,8 +106,14 @@ export default function FaultDetail() {
               )}
             </div>
             {fault.notes && (
-              <div style={{ background: 'var(--cream)', border: '1px solid var(--bdr)', borderRadius: 3, padding: '8px 12px', fontSize: 13, fontStyle: 'italic', color: 'var(--muted)' }}>
+              <div style={{ background: 'var(--cream)', border: '1px solid var(--bdr)', borderRadius: 3, padding: '8px 12px', fontSize: 13, fontStyle: 'italic', color: 'var(--muted)', marginBottom: fault.repair_notes ? 8 : 0 }}>
                 "{fault.notes}"
+              </div>
+            )}
+            {fault.repair_notes && (
+              <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 3, padding: '8px 12px', fontSize: 13 }}>
+                <span style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 1, color: 'var(--green)', display: 'block', marginBottom: 2 }}>REPARATIE NOTITIE</span>
+                {fault.repair_notes}
               </div>
             )}
           </div>
@@ -138,7 +149,35 @@ export default function FaultDetail() {
             </div>
           )}
 
-          {isHub && events.length > 0 && (
+          {user.role !== 'driver' && linkedSchedules.length > 0 && (
+            <div className="htf-card" style={{ marginBottom: 16, borderTop: '3px solid var(--gold)' }}>
+              <div className="lbl" style={{ marginBottom: 8 }}>Ophaalafspraken</div>
+              {linkedSchedules.map((s) => {
+                const fromName = MOCK_MODE ? MOCK_LOC_MAP[s.from_location_id]?.name : s.from_location?.name
+                const toName   = MOCK_MODE ? MOCK_LOC_MAP[s.to_location_id]?.name : s.to_location?.name
+                const driverName = MOCK_MODE ? null : s.driver?.full_name
+                return (
+                  <div key={s.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid #F5E6CC', alignItems: 'center' }}>
+                    <span style={{ fontSize: 18 }}>🚐</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {fmtDate(s.scheduled_date)} · {s.time_from}–{s.time_to}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
+                        {fromName} → {toName}
+                        {driverName ? ` · ${driverName}` : ''}
+                      </div>
+                    </div>
+                    <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
+                      {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {events.length > 0 && (
             <div className="htf-card" style={{ marginBottom: 16 }}>
               <div className="lbl" style={{ marginBottom: 8 }}>Status tijdlijn</div>
               <div style={{ display: 'flex', gap: 0, alignItems: 'center', flexWrap: 'wrap', rowGap: 6 }}>
@@ -167,8 +206,8 @@ export default function FaultDetail() {
                     ▶ Start Fix
                   </button>
                 )}
-                {fault.status === 'in_progress' && (
-                  <button className="btn btn-green btn-sm" onClick={() => updateStatus('ready')}>
+                {fault.status === 'in_progress' && repairInput === null && (
+                  <button className="btn btn-green btn-sm" onClick={() => setRepairInput('')}>
                     ✓ Klaar
                   </button>
                 )}
@@ -177,6 +216,42 @@ export default function FaultDetail() {
                     Afsluiten
                   </button>
                 )}
+              </div>
+              {repairInput !== null && (
+                <div style={{ marginTop: 10 }}>
+                  <textarea
+                    className="txa"
+                    style={{ minHeight: 64, marginBottom: 8 }}
+                    placeholder="Beschrijf wat je gerepareerd hebt… (optioneel)"
+                    value={repairInput}
+                    onChange={(e) => setRepairInput(e.target.value)}
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-green btn-sm" onClick={() => updateStatus('ready', repairInput || undefined)}>
+                      ✓ Bevestigen
+                    </button>
+                    <button className="btn btn-muted btn-sm" onClick={() => setRepairInput(null)}>
+                      Annuleren
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {user.role === 'supervisor' && fault.status === 'closed' && (
+            <div className="htf-card" style={{ marginBottom: 16, borderTop: '3px solid var(--muted)' }}>
+              <div className="lbl">Supervisoracties</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-muted btn-sm"
+                  onClick={() => {
+                    if (confirm(`Storing voor ${fault.vehicle_id} heropenen?`)) updateStatus('open')
+                  }}
+                >
+                  ↩ Heropenen
+                </button>
               </div>
             </div>
           )}

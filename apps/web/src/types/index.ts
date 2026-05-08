@@ -52,6 +52,7 @@ export interface Fault {
   reported_by: string
   fault_type: string
   notes: string | null
+  repair_notes: string | null
   status: FaultStatus
   photo_count: number
   quality_score: number | null

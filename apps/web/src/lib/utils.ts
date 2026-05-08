@@ -63,6 +63,10 @@ export function printChatThread(fault: Fault, messages: ChatMessage[]) {
     </tr>`
   }).join('')
 
+  const repairSection = fault.repair_notes
+    ? `<div style="margin:16px 0;padding:10px 14px;background:#F0FDF4;border-left:3px solid #16A34A;font-size:12px"><strong>Reparatie notitie:</strong> ${fault.repair_notes.replace(/</g, '&lt;')}</div>`
+    : ''
+
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
   <title>Chat ${fault.vehicle_id} — Hi Tom Fleet</title>
   <style>
@@ -75,6 +79,7 @@ export function printChatThread(fault: Fault, messages: ChatMessage[]) {
   </style></head><body>
   <h1>Chatlogboek — ${fault.vehicle_id}</h1>
   <div class="sub">${fault.fault_type} · ${format(new Date(fault.created_at), 'd MMM yyyy', { locale: nl })} · Hi Tom Fleet</div>
+  ${repairSection}
   <table><thead><tr><th>Tijdstip</th><th>Partij</th><th>Bericht</th></tr></thead>
   <tbody>${rows}</tbody></table>
   <div style="margin-top:24px;font-size:11px;color:#999">Gegenereerd door Hi Tom Fleet op ${format(new Date(), 'd MMM yyyy HH:mm', { locale: nl })}</div>

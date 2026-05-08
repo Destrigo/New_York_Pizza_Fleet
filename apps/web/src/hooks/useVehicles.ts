@@ -82,20 +82,32 @@ export function useVehicle(id: string | undefined) {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!id) return
     if (MOCK_MODE) {
       setVehicle(MOCK_VEHICLES.find((v) => v.id === id) ?? null)
       setLoading(false)
       return
     }
-    supabase!
+    const { data } = await supabase!
       .from('vehicles')
       .select('*, location:locations(*)')
       .eq('id', id)
       .single()
-      .then(({ data }) => { setVehicle(data); setLoading(false) })
+    setVehicle(data)
+    setLoading(false)
   }, [id])
+
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!id || MOCK_MODE) return
+    const channel = supabase!
+      .channel(`vehicle-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vehicles', filter: `id=eq.${id}` }, () => { load() })
+      .subscribe()
+    return () => { supabase!.removeChannel(channel) }
+  }, [id, load])
 
   return { vehicle, loading }
 }
