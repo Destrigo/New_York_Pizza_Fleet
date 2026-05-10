@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useI18n } from '@/context/I18nContext'
 
 export default function Unauthorized() {
+  const { t } = useI18n()
   return (
     <div style={{
       minHeight: '100vh', background: 'var(--cream)',
@@ -8,11 +10,11 @@ export default function Unauthorized() {
       textAlign: 'center', padding: 40,
     }}>
       <div style={{ fontSize: 64, marginBottom: 16 }}>🚫</div>
-      <div className="htf-title">Geen toegang</div>
+      <div className="htf-title">{t('noAccess')}</div>
       <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, letterSpacing: 2, color: 'var(--muted)', margin: '8px 0 32px', maxWidth: 340 }}>
-        Je hebt geen toegang tot deze pagina. Neem contact op met je supervisor.
+        {t('noAccessMsg')}
       </div>
-      <Link to="/" className="btn btn-ghost">← Terug naar dashboard</Link>
+      <Link to="/" className="btn btn-ghost">{t('backToDashboard')}</Link>
     </div>
   )
 }

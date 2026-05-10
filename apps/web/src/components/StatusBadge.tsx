@@ -1,26 +1,29 @@
+import { useI18n } from '@/context/I18nContext'
 import type { FaultStatus, VehicleStatus } from '@/types'
 
-const FAULT_MAP: Record<FaultStatus, { cls: string; label: string }> = {
-  open:        { cls: 'badge badge-red',   label: 'Storing' },
-  in_progress: { cls: 'badge badge-gold',  label: 'Start Fix' },
-  ready:       { cls: 'badge badge-green', label: 'Klaar' },
-  closed:      { cls: 'badge badge-muted', label: 'Gesloten' },
+const FAULT_CLS: Record<FaultStatus, string> = {
+  open:        'badge badge-red',
+  in_progress: 'badge badge-gold',
+  ready:       'badge badge-green',
+  closed:      'badge badge-muted',
 }
 
-const VEHICLE_MAP: Record<VehicleStatus, { cls: string; label: string }> = {
-  ok:    { cls: 'badge badge-green', label: 'OK' },
-  fault: { cls: 'badge badge-red',   label: 'Storing' },
-  hub:   { cls: 'badge badge-muted', label: 'In Hub' },
-  fix:   { cls: 'badge badge-gold',  label: 'In Reparatie' },
-  ready: { cls: 'badge badge-green', label: 'Klaar' },
+const VEHICLE_CLS: Record<VehicleStatus, string> = {
+  ok:    'badge badge-green',
+  fault: 'badge badge-red',
+  hub:   'badge badge-muted',
+  fix:   'badge badge-gold',
+  ready: 'badge badge-green',
 }
 
 export function FaultBadge({ status }: { status: FaultStatus }) {
-  const { cls, label } = FAULT_MAP[status] ?? { cls: 'badge badge-muted', label: status }
-  return <span className={cls}>{label}</span>
+  const { t } = useI18n()
+  const cls = FAULT_CLS[status] ?? 'badge badge-muted'
+  return <span className={cls}>{t(`badgeFault_${status}` as Parameters<typeof t>[0])}</span>
 }
 
 export function VehicleBadge({ status }: { status: VehicleStatus }) {
-  const { cls, label } = VEHICLE_MAP[status] ?? { cls: 'badge badge-muted', label: status }
-  return <span className={cls}>{label}</span>
+  const { t } = useI18n()
+  const cls = VEHICLE_CLS[status] ?? 'badge badge-muted'
+  return <span className={cls}>{t(`badgeVehicle_${status}` as Parameters<typeof t>[0])}</span>
 }

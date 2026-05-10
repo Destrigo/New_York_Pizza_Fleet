@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components/Toast'
-import { fmtDateTime, vehicleTypeIcon, faultStatusLabel } from '@/lib/utils'
+import { fmtDateTime, vehicleTypeIcon } from '@/lib/utils'
 import { MOCK_VEHICLES, MOCK_LOC_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 import { useFaults } from '@/hooks/useFaults'
@@ -29,6 +30,7 @@ const colColor: Record<FaultStatus, string> = {
 }
 
 export default function HubQueue() {
+  const { t } = useI18n()
   const toast = useToast()
   const { faults, loading, updateStatus } = useFaults({ status: ['open', 'in_progress', 'ready'] })
   const [filterType, setFilterType] = useState<string>('all')
@@ -51,37 +53,38 @@ export default function HubQueue() {
   const advance = (fault: Fault) => {
     const next: FaultStatus = fault.status === 'open' ? 'in_progress' : fault.status === 'in_progress' ? 'ready' : 'closed'
     updateStatus(fault.id, next)
-    toast(`${fault.vehicle_id} → ${faultStatusLabel[next]}`)
+    toast(`${fault.vehicle_id} → ${t(`badgeFault_${next}` as Parameters<typeof t>[0])}`)
   }
 
   const readyFaults = grouped['ready'] ?? []
   const closeAllReady = async () => {
     if (readyFaults.length === 0) return
-    if (!confirm(`${readyFaults.length} klare storing${readyFaults.length !== 1 ? 'en' : ''} afsluiten?`)) return
+    const label = readyFaults.length !== 1 ? t('readyFaultPlural') : t('readyFaultSingular')
+    if (!confirm(`${readyFaults.length} ${label} ${t('confirmCloseReadySuffix')}`)) return
     for (const f of readyFaults) await updateStatus(f.id, 'closed')
-    toast(`${readyFaults.length} storingen afgesloten.`)
+    toast(`${readyFaults.length} ${t('toastFaultsClosedSuffix')}`)
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
-          <div className="htf-title">Storing Queue</div>
-          <div className="htf-sub">Hub operaties · Live overzicht</div>
+          <div className="htf-title">{t('queueTitle')}</div>
+          <div className="htf-sub">{t('queueSub')}</div>
         </div>
         {readyFaults.length > 0 && (
           <button className="btn btn-muted btn-sm" onClick={closeAllReady}>
-            Alles klaar afsluiten ({readyFaults.length})
+            {t('closeAllReady')} ({readyFaults.length})
           </button>
         )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {['all', 'ebike', 'scooter', 'car', 'bus'].map((t) => (
-          <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(t)}>
-            {t === 'all' ? 'Alle' : t}
+        {['all', 'ebike', 'scooter', 'car', 'bus'].map((tp) => (
+          <button key={tp} className={`btn btn-sm ${filterType === tp ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(tp)}>
+            {tp === 'all' ? t('all') : tp}
           </button>
         ))}
       </div>
@@ -92,7 +95,7 @@ export default function HubQueue() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: colColor[status] }} />
               <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: colColor[status] }}>
-                {faultStatusLabel[status]}
+                {t(`badgeFault_${status}` as Parameters<typeof t>[0])}
               </div>
               <div style={{ background: colColor[status], color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
                 {grouped[status].length}
@@ -102,7 +105,7 @@ export default function HubQueue() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {grouped[status].length === 0 ? (
                 <div style={{ padding: 16, textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '2px dashed var(--bdr)', borderRadius: 4 }}>
-                  Leeg
+                  {t('empty')}
                 </div>
               ) : grouped[status].map((f) => {
                 const vehicle = getVehicle(f)
@@ -120,7 +123,7 @@ export default function HubQueue() {
                     <div style={{ fontSize: 12, marginBottom: 6 }}>{f.fault_type}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'Barlow Condensed'" }}>
-                        {fmtDateTime(f.created_at)} · {f.photo_count} foto's
+                        {fmtDateTime(f.created_at)} · {f.photo_count} {t('photoCountSuffix')}
                       </div>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         {f.quality_score != null && (
@@ -135,7 +138,7 @@ export default function HubQueue() {
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <Link to={`/faults/${f.id}`} className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
-                        💬 Detail
+                        {t('detail')}
                       </Link>
                       {canAdv && (
                         <button
@@ -143,7 +146,7 @@ export default function HubQueue() {
                           style={{ flex: 1, background: colColor[f.status === 'open' ? 'in_progress' : 'ready'], color: '#fff' }}
                           onClick={() => advance(f)}
                         >
-                          {f.status === 'open' ? '▶ Start Fix' : '✓ Klaar'}
+                          {f.status === 'open' ? t('startFix') : t('markReady')}
                         </button>
                       )}
                     </div>

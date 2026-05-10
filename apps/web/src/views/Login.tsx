@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { MOCK_MODE } from '@/lib/supabase'
 import { DEMO_PROFILES } from '@/lib/mock'
 
 export default function Login() {
   const { signIn, signInMock } = useAuth()
+  const { t } = useI18n()
   const navigate = useNavigate()
 
   const [email, setEmail]       = useState('')
@@ -41,7 +43,7 @@ export default function Login() {
           🍕 <em style={{ fontStyle: 'italic', color: 'var(--green)' }}>Hi Tom</em> Fleet
         </div>
         <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, letterSpacing: 4, textTransform: 'uppercase', color: 'var(--muted)', marginTop: 8 }}>
-          Voertuig beheer & storing systeem
+          {t('vehicleSystem')}
         </div>
       </div>
 
@@ -49,10 +51,10 @@ export default function Login() {
         {MOCK_MODE ? (
           <>
             <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--gold)', marginBottom: 16 }}>
-              ⚠ Demo modus — geen Supabase verbinding
+              {t('demoMode')}
             </div>
             <div className="field">
-              <label className="lbl">Inloggen als</label>
+              <label className="lbl">{t('signingInAs')}</label>
               <select className="sel" value={mockId} onChange={(e) => setMockId(e.target.value)}>
                 {DEMO_PROFILES.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
@@ -60,23 +62,23 @@ export default function Login() {
               </select>
             </div>
             <button className="btn btn-red" style={{ width: '100%', padding: 14 }} onClick={handleMock}>
-              Inloggen →
+              {t('loginBtn')}
             </button>
           </>
         ) : (
           <form onSubmit={handleReal}>
             <div style={{ fontFamily: "'Playfair Display'", fontSize: 20, fontWeight: 700, marginBottom: 20, color: 'var(--ink)' }}>
-              Inloggen
+              {t('loginTitle')}
             </div>
             <div className="field">
-              <label className="lbl">E-mailadres</label>
+              <label className="lbl">{t('emailLabel')}</label>
               <input
                 className="inp" type="email" required autoComplete="email"
                 value={email} onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="field">
-              <label className="lbl">Wachtwoord</label>
+              <label className="lbl">{t('newPassword')}</label>
               <input
                 className="inp" type="password" required autoComplete="current-password"
                 value={password} onChange={(e) => setPassword(e.target.value)}
@@ -88,7 +90,7 @@ export default function Login() {
               </div>
             )}
             <button className="btn btn-red" style={{ width: '100%', padding: 14 }} disabled={loading}>
-              {loading ? 'Bezig…' : 'Inloggen →'}
+              {loading ? t('loggingIn') : t('loginBtn')}
             </button>
           </form>
         )}

@@ -34,13 +34,13 @@ export default function DriverSchedule() {
           className={`btn btn-sm ${date === today ? 'btn-red' : 'btn-muted'}`}
           onClick={() => setDate(today)}
         >
-          Vandaag
+          {t('today')}
         </button>
         <button
           className={`btn btn-sm ${date === tomorrow ? 'btn-red' : 'btn-muted'}`}
           onClick={() => setDate(tomorrow)}
         >
-          Morgen
+          {t('tomorrow')}
         </button>
         <input
           className="inp"
@@ -62,16 +62,16 @@ export default function DriverSchedule() {
         <div className="htf-card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚐</div>
           <div style={{ fontSize: 16, fontFamily: "'Playfair Display'", fontWeight: 700, marginBottom: 8 }}>
-            Geen ritten gepland
+            {t('noRidesTitle')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-            Er zijn geen ritten gepland voor {fmtDate(date)}.
+            {t('noRidesFor')} {fmtDate(date)}.
           </div>
         </div>
       ) : (
         <>
           <div style={{ marginBottom: 16, fontFamily: "'Barlow Condensed'", fontSize: 13, letterSpacing: 1, color: 'var(--muted)' }}>
-            {myItems.length} rit{myItems.length !== 1 ? 'ten' : ''} op {fmtDate(date)}
+            {myItems.length} {myItems.length !== 1 ? t('ridePlural') : t('rideSingular')} {t('ridesOn')} {fmtDate(date)}
           </div>
           {myItems.map((s, idx) => {
             const from = getLoc(s.from_location_id, s.from_location)
@@ -92,7 +92,7 @@ export default function DriverSchedule() {
                   </div>
                   <div style={{ fontSize: 13, marginBottom: 4 }}>
                     <strong>{s.vehicle_id}</strong>
-                    {from?.name?.includes('Hub') ? ' — Afleveren' : ' — Ophalen'}
+                    {from?.name?.includes('Hub') ? ` — ${t('deliver')}` : ` — ${t('pickup')}`}
                   </div>
                   {from?.address && (
                     <a
@@ -126,7 +126,7 @@ export default function DriverSchedule() {
       )}
 
       <div className="policy-banner" style={{ borderRadius: 4, marginTop: 24 }}>
-        📵 Communicatie verloopt uitsluitend via Hi Tom Fleet. Geen telefonisch contact.
+        {t('policyBanner')}
       </div>
     </div>
   )

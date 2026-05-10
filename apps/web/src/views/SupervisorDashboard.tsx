@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { FaultBadge, VehicleBadge } from '@/components/StatusBadge'
 import { fmtDate, fmtDateTime, vehicleTypeIcon, vehicleTypeLabel, exportCsv } from '@/lib/utils'
 import { MOCK_LOC_MAP, MOCK_USERS_MAP } from '@/lib/mock'
@@ -19,6 +20,7 @@ const STATUS_ORDER: FaultStatus[] = ['open', 'in_progress', 'ready', 'closed']
 
 export default function SupervisorDashboard() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [tab, setTab]           = useState<'overview' | 'faults' | 'ranking' | 'locations' | 'planning'>('overview')
   const [rankPeriod, setRankPeriod] = useState<RankPeriod>('month')
   const [drillLoc, setDrillLoc] = useState<string | null>(null)
@@ -33,22 +35,21 @@ export default function SupervisorDashboard() {
   const { schedules: allSchedules } = useSchedules({})
 
   if (!user) return null
-  if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+  if (fLoading || vLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
 
   const activeFaults = allFaults.filter((f) => f.status !== 'closed')
   const hubVehicles  = allVehicles.filter((v) => MOCK_MODE ? (v.location_id === 'hub-hfd' || v.location_id === 'hub-ens') : v.location?.is_hub)
 
   const shortages = nonHubLocations.flatMap((loc) =>
-    (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).flatMap((type) => {
-      const target = reserves.find((r) => r.location_id === loc.id && r.vehicle_type === type)?.target_count ?? 0
+    (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).flatMap((vtype) => {
+      const target = reserves.find((r) => r.location_id === loc.id && r.vehicle_type === vtype)?.target_count ?? 0
       if (target === 0) return []
-      const actual = allVehicles.filter((v) => v.location_id === loc.id && v.type === type && v.status === 'ok').length
+      const actual = allVehicles.filter((v) => v.location_id === loc.id && v.type === vtype && v.status === 'ok').length
       if (actual >= target) return []
-      return [{ locId: loc.id, locName: loc.name, type, actual, target, deficit: target - actual }]
+      return [{ locId: loc.id, locName: loc.name, type: vtype, actual, target, deficit: target - actual }]
     })
   ).sort((a, b) => b.deficit - a.deficit)
 
-  // Period filter for ranking
   const now = new Date()
   const getPeriodRange = (p: RankPeriod): [string, string] => {
     const y = now.getFullYear(), m = now.getMonth()
@@ -65,7 +66,6 @@ export default function SupervisorDashboard() {
     f.created_at >= rangeFrom && f.created_at.substring(0, 10) <= rangeTo
   )
 
-  // Compute ranking from period-filtered faults
   const rankGroups: Record<string, { name: string; count: number; scores: number[] }> = {}
   for (const f of periodFaults) {
     const locId = f.location_id
@@ -86,11 +86,11 @@ export default function SupervisorDashboard() {
   const getDrillLocName = (locId: string) =>
     MOCK_MODE ? (MOCK_LOC_MAP[locId]?.name ?? locId) : (nonHubLocations.find((l) => l.id === locId)?.name ?? locId)
 
-  const totalByType = (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).map((t) => ({
-    type: t,
-    total: allVehicles.filter((v) => v.type === t).length,
-    ok:    allVehicles.filter((v) => v.type === t && v.status === 'ok').length,
-    fault: allVehicles.filter((v) => v.type === t && (v.status === 'fault' || v.status === 'fix')).length,
+  const totalByType = (['ebike', 'scooter', 'car', 'bus'] as VehicleType[]).map((vtype) => ({
+    type:  vtype,
+    total: allVehicles.filter((v) => v.type === vtype).length,
+    ok:    allVehicles.filter((v) => v.type === vtype && v.status === 'ok').length,
+    fault: allVehicles.filter((v) => v.type === vtype && (v.status === 'fault' || v.status === 'fix')).length,
   }))
 
   const filteredFaults = allFaults.filter((f) => {
@@ -124,12 +124,12 @@ export default function SupervisorDashboard() {
   return (
     <div>
       <div className="htf-title">Supervisor Dashboard</div>
-      <div className="htf-sub">{user.full_name} · Overzicht alle locaties</div>
+      <div className="htf-sub">{user.full_name} · {t('supSub')}</div>
 
       <div className="tabs">
-        {(['overview', 'faults', 'ranking', 'locations', 'planning'] as const).map((t) => (
-          <button key={t} className={`tab ${tab === t ? 'tab-on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'overview' ? 'Overzicht' : t === 'faults' ? 'Storingen' : t === 'ranking' ? 'Ranking' : t === 'locations' ? 'Locaties' : 'Planning'}
+        {(['overview', 'faults', 'ranking', 'locations', 'planning'] as const).map((tabKey) => (
+          <button key={tabKey} className={`tab ${tab === tabKey ? 'tab-on' : ''}`} onClick={() => setTab(tabKey)}>
+            {tabKey === 'overview' ? t('tabOverview') : tabKey === 'faults' ? t('tabFaults') : tabKey === 'ranking' ? t('tabRanking') : tabKey === 'locations' ? t('tabLocations') : t('tabPlanning')}
           </button>
         ))}
       </div>
@@ -137,16 +137,16 @@ export default function SupervisorDashboard() {
       {/* ── OVERVIEW ── */}
       {tab === 'overview' && (
         <>
-          <div className="htf-sh"><h2>Vloot overzicht</h2><div className="htf-rule" /></div>
+          <div className="htf-sh"><h2>{t('fleetOverview')}</h2><div className="htf-rule" /></div>
           <div className="htf-stats" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>
-            {totalByType.map((t) => (
-              <div key={t.type} className="htf-stat">
-                <div style={{ fontSize: 24, marginBottom: 4 }}>{vehicleTypeIcon[t.type]}</div>
-                <div className="htf-stat-n">{t.total}</div>
-                <div className="htf-stat-l">{vehicleTypeLabel[t.type]}s</div>
+            {totalByType.map((stat) => (
+              <div key={stat.type} className="htf-stat">
+                <div style={{ fontSize: 24, marginBottom: 4 }}>{vehicleTypeIcon[stat.type]}</div>
+                <div className="htf-stat-n">{stat.total}</div>
+                <div className="htf-stat-l">{vehicleTypeLabel[stat.type]}s</div>
                 <div style={{ fontSize: 11, fontFamily: "'Barlow Condensed'", letterSpacing: 1, marginTop: 6 }}>
-                  <span style={{ color: 'var(--green)' }}>{t.ok} ok</span>
-                  {t.fault > 0 && <span style={{ color: 'var(--red)', marginLeft: 6 }}>{t.fault} storing</span>}
+                  <span style={{ color: 'var(--green)' }}>{stat.ok} ok</span>
+                  {stat.fault > 0 && <span style={{ color: 'var(--red)', marginLeft: 6 }}>{stat.fault} {stat.fault !== 1 ? t('faults') : t('faultSingular')}</span>}
                 </div>
               </div>
             ))}
@@ -154,7 +154,7 @@ export default function SupervisorDashboard() {
 
           <div className="grid-2">
             <div className="htf-card">
-              <div className="htf-sh"><h2>Actieve storingen</h2><div className="htf-rule" /></div>
+              <div className="htf-sh"><h2>{t('activeFaultsSup')}</h2><div className="htf-rule" /></div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
                 {STATUS_ORDER.filter((s) => s !== 'closed').map((s) => {
                   const cnt = activeFaults.filter((f) => f.status === s).length
@@ -162,7 +162,7 @@ export default function SupervisorDashboard() {
                     <div key={s} style={{ textAlign: 'center' }}>
                       <div style={{ fontFamily: "'Playfair Display'", fontSize: 28, fontWeight: 900, color: s === 'open' ? 'var(--red)' : s === 'in_progress' ? 'var(--gold)' : 'var(--green)' }}>{cnt}</div>
                       <div style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
-                        {s === 'open' ? 'Storing' : s === 'in_progress' ? 'Bezig' : 'Klaar'}
+                        {t(`badgeFault_${s}` as Parameters<typeof t>[0])}
                       </div>
                     </div>
                   )
@@ -173,18 +173,18 @@ export default function SupervisorDashboard() {
                       {avgResolutionHours < 24 ? `${avgResolutionHours.toFixed(0)}u` : `${(avgResolutionHours / 24).toFixed(1)}d`}
                     </div>
                     <div style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)' }}>
-                      Gem. looptijd
+                      {t('avgDuration')}
                     </div>
                   </div>
                 )}
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setTab('faults')}>Alle storingen →</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setTab('faults')}>{t('allFaultsBtn')}</button>
             </div>
 
             <div className="htf-card htf-card-green">
-              <div className="htf-sh"><h2>Hub inventaris</h2><div className="htf-rule" /></div>
+              <div className="htf-sh"><h2>{t('hubInventory')}</h2><div className="htf-rule" /></div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
-                {hubVehicles.length} voertuigen in Hub
+                {hubVehicles.length} {t('vehiclesInHub')}
               </div>
               {hubVehicles.slice(0, 6).map((v: Vehicle) => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #F5E6CC' }}>
@@ -194,7 +194,7 @@ export default function SupervisorDashboard() {
                 </div>
               ))}
               {hubVehicles.length > 6 && (
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>+ {hubVehicles.length - 6} meer</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>+ {hubVehicles.length - 6} {t('moreVehicles')}</div>
               )}
             </div>
           </div>
@@ -202,9 +202,9 @@ export default function SupervisorDashboard() {
           {shortages.length > 0 && (
             <>
               <div className="htf-sh" style={{ marginTop: 24 }}>
-                <h2>Reserve tekort ⚠</h2>
+                <h2>{t('reserveShortage')}</h2>
                 <div className="htf-rule" />
-                <Link to="/admin/reserves" className="btn btn-ghost btn-sm">Beheren →</Link>
+                <Link to="/admin/reserves" className="btn btn-ghost btn-sm">{t('manageReserves')}</Link>
               </div>
               <div className="htf-card" style={{ padding: 0, borderTop: '3px solid var(--red)' }}>
                 {shortages.map((s, i) => (
@@ -226,7 +226,7 @@ export default function SupervisorDashboard() {
                         {s.actual} / {s.target}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--red)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
-                        -{s.deficit} tekort
+                        -{s.deficit} {t('deficit')}
                       </div>
                     </div>
                   </div>
@@ -243,7 +243,7 @@ export default function SupervisorDashboard() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               className="inp"
-              placeholder="Zoek op voertuig, type, locatie…"
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setVisibleFaults(20) }}
               style={{ maxWidth: 240, height: 32 }}
@@ -254,7 +254,7 @@ export default function SupervisorDashboard() {
                 className={`btn btn-sm ${filterStatus === s ? 'btn-red' : 'btn-muted'}`}
                 onClick={() => { setFilterStatus(s); setVisibleFaults(20) }}
               >
-                {s === 'all' ? 'Alle' : s === 'open' ? 'Storing' : s === 'in_progress' ? 'Start Fix' : s === 'ready' ? 'Klaar' : 'Gesloten'}
+                {s === 'all' ? t('all') : t(`badgeFault_${s}` as Parameters<typeof t>[0])}
               </button>
             ))}
             <button
@@ -263,25 +263,25 @@ export default function SupervisorDashboard() {
               onClick={() => exportCsv(
                 filteredFaults.map((f) => ({
                   id: f.id,
-                  voertuig: f.vehicle_id,
-                  locatie: getFaultLoc(f)?.name ?? f.location_id,
+                  vehicle: f.vehicle_id,
+                  location: getFaultLoc(f)?.name ?? f.location_id,
                   type: f.fault_type,
                   status: f.status,
-                  fotos: f.photo_count,
-                  kwaliteit: f.quality_score ?? '',
-                  datum: fmtDateTime(f.created_at),
-                  notities: f.notes ?? '',
-                  reparatie: f.repair_notes ?? '',
+                  photos: f.photo_count,
+                  quality: f.quality_score ?? '',
+                  date: fmtDateTime(f.created_at),
+                  notes: f.notes ?? '',
+                  repair: f.repair_notes ?? '',
                 })),
-                `storingen-${new Date().toISOString().split('T')[0]}.csv`
+                `faults-${new Date().toISOString().split('T')[0]}.csv`
               )}
             >
-              ↓ CSV exporteren
+              {t('exportCsv')}
             </button>
           </div>
           <div className="htf-card" style={{ padding: 0 }}>
             {filteredFaults.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Geen storingen gevonden.</div>
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{t('noFaultsFound')}</div>
             ) : filteredFaults.slice(0, visibleFaults).map((f) => (
               <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="fault-row">
@@ -300,7 +300,7 @@ export default function SupervisorDashboard() {
           {visibleFaults < filteredFaults.length && (
             <div style={{ textAlign: 'center', marginTop: 10 }}>
               <button className="btn btn-ghost btn-sm" onClick={() => setVisibleFaults((n) => n + 20)}>
-                Meer laden ({filteredFaults.length - visibleFaults} resterend) →
+                {t('loadMore')} ({filteredFaults.length - visibleFaults} {t('remaining')}) →
               </button>
             </div>
           )}
@@ -313,7 +313,7 @@ export default function SupervisorDashboard() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             {(['month', 'prev', 'ytd'] as const).map((p) => (
               <button key={p} className={`btn btn-sm ${rankPeriod === p ? 'btn-red' : 'btn-muted'}`} onClick={() => setRankPeriod(p)}>
-                {p === 'month' ? 'Deze maand' : p === 'prev' ? 'Vorige maand' : 'Jaar tot nu'}
+                {p === 'month' ? t('thisMonth') : p === 'prev' ? t('prevMonth') : t('ytd')}
               </button>
             ))}
             {rankEntries.length > 0 && (
@@ -323,21 +323,21 @@ export default function SupervisorDashboard() {
                 onClick={() => exportCsv(
                   rankByFaults.map((r, i) => ({
                     rank: i + 1,
-                    locatie: r.location_name,
-                    storingen: r.fault_count,
-                    kwaliteit: r.quality_avg.toFixed(1),
+                    location: r.location_name,
+                    faults: r.fault_count,
+                    quality: r.quality_avg.toFixed(1),
                   })),
                   `ranking-${rankPeriod}-${new Date().toISOString().split('T')[0]}.csv`
                 )}
               >
-                ↓ CSV
+                {t('csv')}
               </button>
             )}
           </div>
 
           <div className="grid-2">
             <div>
-              <div className="htf-sh"><h2>Ranking storingen</h2><div className="htf-rule" /></div>
+              <div className="htf-sh"><h2>{t('rankFaults')}</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
                 {rankByFaults.map((r, i) => (
                   <div key={r.location_id} className="rank-row" style={{ cursor: 'pointer' }} onClick={() => { setDrillLoc(r.location_id); setTab('locations') }}>
@@ -349,7 +349,7 @@ export default function SupervisorDashboard() {
               </div>
             </div>
             <div>
-              <div className="htf-sh"><h2>Kwaliteit meldingen ★</h2><div className="htf-rule" /></div>
+              <div className="htf-sh"><h2>{t('rankingQuality')}</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
                 {rankByQuality.map((r, i) => (
                   <div key={r.location_id} className="rank-row">
@@ -370,17 +370,17 @@ export default function SupervisorDashboard() {
           {drillLoc ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => setDrillLoc(null)}>← Alle locaties</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setDrillLoc(null)}>{t('backToLocations')}</button>
                 <div style={{ fontFamily: "'Playfair Display'", fontSize: 22, fontWeight: 700 }}>
                   {getDrillLocName(drillLoc)}
                 </div>
               </div>
               <div className="grid-2">
                 <div>
-                  <div className="htf-sh"><h2>Voertuigen</h2><div className="htf-rule" /></div>
+                  <div className="htf-sh"><h2>{t('vehicles')}</h2><div className="htf-rule" /></div>
                   <div className="htf-card" style={{ padding: 0 }}>
                     {drillVehicles.length === 0 ? (
-                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>Geen voertuigen</div>
+                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>{t('noVehiclesAtLoc')}</div>
                     ) : drillVehicles.map((v) => (
                       <div key={v.id} style={{ display: 'flex', gap: 10, padding: '10px 14px', borderBottom: '1px solid #F5E6CC', alignItems: 'center' }}>
                         <span style={{ fontSize: 18 }}>{vehicleTypeIcon[v.type]}</span>
@@ -391,10 +391,10 @@ export default function SupervisorDashboard() {
                   </div>
                 </div>
                 <div>
-                  <div className="htf-sh"><h2>Storingen</h2><div className="htf-rule" /></div>
+                  <div className="htf-sh"><h2>{t('faults')}</h2><div className="htf-rule" /></div>
                   <div className="htf-card" style={{ padding: 0 }}>
                     {drillFaults.length === 0 ? (
-                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>Geen storingen</div>
+                      <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>{t('noFaultsAtLoc')}</div>
                     ) : drillFaults.map((f) => (
                       <Link key={f.id} to={`/faults/${f.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                         <div className="fault-row">
@@ -412,7 +412,7 @@ export default function SupervisorDashboard() {
             </>
           ) : (
             <>
-              <div className="htf-sh"><h2>Alle locaties</h2><div className="htf-rule" /></div>
+              <div className="htf-sh"><h2>{t('allLocations')}</h2><div className="htf-rule" /></div>
               <div className="htf-card" style={{ padding: 0 }}>
                 {nonHubLocations.map((loc) => {
                   const faultCnt = allFaults.filter((f) => f.location_id === loc.id && f.status !== 'closed').length
@@ -421,9 +421,9 @@ export default function SupervisorDashboard() {
                     <div key={loc.id} className="fault-row" style={{ cursor: 'pointer' }} onClick={() => setDrillLoc(loc.id)}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600 }}>{loc.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>{loc.city} · {vCnt} voertuigen</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>{loc.city} · {vCnt} {t('vehiclesSuffix')}</div>
                       </div>
-                      {faultCnt > 0 && <span className="badge badge-red">{faultCnt} storing{faultCnt !== 1 ? 'en' : ''}</span>}
+                      {faultCnt > 0 && <span className="badge badge-red">{faultCnt} {faultCnt !== 1 ? t('faults') : t('faultSingular')}</span>}
                     </div>
                   )
                 })}
@@ -432,6 +432,7 @@ export default function SupervisorDashboard() {
           )}
         </>
       )}
+
       {/* ── PLANNING ── */}
       {tab === 'planning' && (() => {
         const grouped = allSchedules.reduce((acc, s) => {
@@ -451,26 +452,26 @@ export default function SupervisorDashboard() {
           <>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
               <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, color: 'var(--muted)', letterSpacing: 1 }}>
-                {allSchedules.filter((s) => s.status === 'planned').length} gepland · {allSchedules.filter((s) => s.status === 'completed').length} voltooid
+                {allSchedules.filter((s) => s.status === 'planned').length} {t('planned')} · {allSchedules.filter((s) => s.status === 'completed').length} {t('completed')}
               </div>
               <button
                 className="btn btn-ghost btn-sm"
                 style={{ marginLeft: 'auto' }}
                 onClick={() => exportCsv(
                   allSchedules.map((s) => ({
-                    datum: s.scheduled_date,
-                    van: getSchedFromName(s),
-                    naar: getSchedToName(s),
-                    voertuig: s.vehicle_id,
-                    chauffeur: getSchedDriverName(s),
-                    tijd: `${s.time_from}–${s.time_to}`,
+                    date: s.scheduled_date,
+                    from: getSchedFromName(s),
+                    to: getSchedToName(s),
+                    vehicle: s.vehicle_id,
+                    driver: getSchedDriverName(s),
+                    time: `${s.time_from}–${s.time_to}`,
                     status: s.status,
-                    notities: s.notes ?? '',
+                    notes: s.notes ?? '',
                   })),
-                  `planning-${new Date().toISOString().split('T')[0]}.csv`
+                  `schedule-${new Date().toISOString().split('T')[0]}.csv`
                 )}
               >
-                ↓ CSV
+                {t('csv')}
               </button>
             </div>
 
@@ -480,7 +481,7 @@ export default function SupervisorDashboard() {
                   <h2>{fmtDate(date)}</h2>
                   <div className="htf-rule" />
                   <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, color: 'var(--muted)', letterSpacing: 1 }}>
-                    {items.filter((s) => s.status === 'planned').length} gepland · {items.filter((s) => s.status === 'completed').length} voltooid
+                    {items.filter((s) => s.status === 'planned').length} {t('planned')} · {items.filter((s) => s.status === 'completed').length} {t('completed')}
                   </div>
                 </div>
                 <div className="htf-card" style={{ padding: 0 }}>
@@ -497,7 +498,7 @@ export default function SupervisorDashboard() {
                         {s.notes && <div style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic', marginTop: 2 }}>{s.notes}</div>}
                       </div>
                       <span className={`badge ${s.status === 'completed' ? 'badge-green' : s.status === 'cancelled' ? 'badge-muted' : 'badge-gold'}`}>
-                        {s.status === 'planned' ? 'Gepland' : s.status === 'completed' ? 'Voltooid' : 'Geannuleerd'}
+                        {t(`scheduleStatus_${s.status}` as Parameters<typeof t>[0])}
                       </span>
                     </div>
                   ))}
@@ -507,7 +508,7 @@ export default function SupervisorDashboard() {
 
             {Object.keys(grouped).length === 0 && (
               <div className="htf-card" style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-                Geen ophaalafspraken gevonden.
+                {t('noSchedules')}
               </div>
             )}
           </>

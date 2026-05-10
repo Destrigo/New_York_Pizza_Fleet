@@ -1,9 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useNotifications } from '@/hooks/useNotifications'
 
 export default function MobileNav() {
   const { user, signOut } = useAuth()
+  const { t } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
   const { unreadCount } = useNotifications()
@@ -18,10 +20,10 @@ export default function MobileNav() {
   }
 
   const items = [
-    { to: '/dashboard',      icon: '🏠', label: 'Dashboard' },
-    { to: '/report',         icon: '⚠',  label: 'Melding' },
-    { to: '/notifications',  icon: '🔔', label: 'Notificaties', badge: unreadCount },
-    { to: '/profile',        icon: '👤', label: 'Profiel' },
+    { to: '/dashboard',      icon: '🏠', label: t('tabDashboard') },
+    { to: '/report',         icon: '⚠',  label: t('mobileNavReport') },
+    { to: '/notifications',  icon: '🔔', label: t('navNotifications'), badge: unreadCount },
+    { to: '/profile',        icon: '👤', label: t('navProfile') },
   ] as const
 
   return (
@@ -72,7 +74,7 @@ export default function MobileNav() {
       >
         <span style={{ fontSize: 20, marginBottom: 2 }}>🚪</span>
         <span style={{ fontSize: 10, fontFamily: "'Barlow Condensed'", letterSpacing: 1, textTransform: 'uppercase' }}>
-          Uitloggen
+          {t('navLogout')}
         </span>
       </button>
     </nav>

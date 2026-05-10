@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components/Toast'
 import { VehicleBadge } from '@/components/StatusBadge'
 import { vehicleTypeIcon, vehicleTypeLabel } from '@/lib/utils'
@@ -12,6 +13,7 @@ import type { VehicleType } from '@/types'
 
 export default function HubVehicles() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const toast = useToast()
   const { vehicles, loading, assign } = useVehicles({ hubOnly: true })
   const { locations: destLocations }  = useLocations({ excludeHub: true })
@@ -33,47 +35,48 @@ export default function HubVehicles() {
     if (!targetLoc || selected.length === 0) return
     const loc = destLocations.find((l) => l.id === targetLoc)
     const locName = loc?.name ?? MOCK_LOC_MAP[targetLoc]?.name ?? targetLoc
-    if (!confirm(`${selected.length} voertuig${selected.length !== 1 ? 'en' : ''} toewijzen aan ${locName}?`)) return
+    const vehicleLabel = selected.length !== 1 ? t('vehiclesSelected') : t('vehicleSelected')
+    if (!confirm(`${selected.length} ${vehicleLabel} ${t('confirmAssignToInfix')} ${locName}?`)) return
     for (const vehicleId of selected) {
       await assign(vehicleId, targetLoc, user.id)
     }
-    toast(`${selected.length} voertuig${selected.length !== 1 ? 'en' : ''} toegewezen aan ${locName}.`)
+    toast(`${selected.length} ${vehicleLabel} ${t('toastAssignedToInfix')} ${locName}.`)
     setSelected([])
     setTargetLoc('')
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
 
   return (
     <div>
-      <div className="htf-title">Hub Voertuigen</div>
-      <div className="htf-sub">Toewijzen aan locaties</div>
+      <div className="htf-title">{t('hubVehiclesTitle')}</div>
+      <div className="htf-sub">{t('hubVehiclesSub')}</div>
 
       {selected.length > 0 && (
         <div style={{ background: 'var(--cream2)', border: '1px solid var(--bdr)', borderRadius: 4, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ fontFamily: "'Barlow Condensed'", fontSize: 13, letterSpacing: 1 }}>
-            {selected.length} voertuig{selected.length !== 1 ? 'en' : ''} geselecteerd
+            {selected.length} {selected.length !== 1 ? t('vehiclesSelected') : t('vehicleSelected')}
           </div>
           <select className="sel" style={{ flex: 1, maxWidth: 280 }} value={targetLoc} onChange={(e) => setTargetLoc(e.target.value)}>
-            <option value="">— Kies doellocatie —</option>
+            <option value="">{t('chooseDestination')}</option>
             {destLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
           <button className="btn btn-green btn-sm" onClick={assignAll} disabled={!targetLoc}>
-            Toewijzen →
+            {t('assignBtn')}
           </button>
-          <button className="btn btn-muted btn-sm" onClick={() => setSelected([])}>Annuleren</button>
+          <button className="btn btn-muted btn-sm" onClick={() => setSelected([])}>{t('cancel')}</button>
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {(['all', 'ebike', 'scooter', 'car', 'bus'] as const).map((t) => (
-          <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(t)}>
-            {t === 'all' ? 'Alle' : vehicleTypeLabel[t]}
+        {(['all', 'ebike', 'scooter', 'car', 'bus'] as const).map((tp) => (
+          <button key={tp} className={`btn btn-sm ${filterType === tp ? 'btn-red' : 'btn-muted'}`} onClick={() => setFilterType(tp)}>
+            {tp === 'all' ? t('all') : vehicleTypeLabel[tp]}
           </button>
         ))}
         <input
           className="inp"
-          placeholder="Zoek voertuig-ID…"
+          placeholder={t('searchVehicleId')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ maxWidth: 180, height: 32, marginLeft: 'auto' }}
@@ -94,8 +97,8 @@ export default function HubVehicles() {
               <th>ID</th>
               <th>Type</th>
               <th>Status</th>
-              <th>Hub</th>
-              <th>Acties</th>
+              <th>{t('colHub')}</th>
+              <th>{t('colActions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -114,7 +117,7 @@ export default function HubVehicles() {
                   <td style={{ fontSize: 12, color: 'var(--muted)' }}>{locName}</td>
                   <td>
                     <button className="btn btn-ghost btn-sm" onClick={() => setSelected([v.id])}>
-                      Toewijzen
+                      {t('assignAction')}
                     </button>
                   </td>
                 </tr>
@@ -123,7 +126,7 @@ export default function HubVehicles() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>Geen voertuigen in Hub</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>{t('noVehiclesInHub')}</div>
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useI18n } from '@/context/I18nContext'
 import { useNotifications } from '@/hooks/useNotifications'
 import { fmtAgo } from '@/lib/utils'
 
@@ -12,19 +13,20 @@ const typeIcon: Record<string, string> = {
 }
 
 export default function Notifications() {
+  const { t } = useI18n()
   const { notifs, loading, unreadCount, markRead, markAllRead } = useNotifications()
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div className="htf-title">Notificaties</div>
-          <div className="htf-sub">{unreadCount > 0 ? `${unreadCount} ongelezen` : 'Alles gelezen'}</div>
+          <div className="htf-title">{t('notifTitle')}</div>
+          <div className="htf-sub">{unreadCount > 0 ? `${unreadCount} ${t('unread')}` : t('allRead')}</div>
         </div>
         {unreadCount > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={markAllRead}>Alles gelezen markeren</button>
+          <button className="btn btn-ghost btn-sm" onClick={markAllRead}>{t('markAllRead')}</button>
         )}
       </div>
 
@@ -32,7 +34,7 @@ export default function Notifications() {
         {notifs.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
-            Geen notificaties
+            {t('noNotifications')}
           </div>
         ) : (
           notifs.map((n) => (
@@ -62,7 +64,7 @@ export default function Notifications() {
                       onClick={(e) => e.stopPropagation()}
                       style={{ color: 'var(--red)', textDecoration: 'none' }}
                     >
-                      Bekijk storing →
+                      {t('viewFault')}
                     </Link>
                   )}
                 </div>

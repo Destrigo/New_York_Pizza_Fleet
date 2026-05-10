@@ -1,20 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components/Toast'
-import { roleLabel } from '@/lib/utils'
 import { MOCK_MODE, supabase } from '@/lib/supabase'
 import { MOCK_LOC_MAP } from '@/lib/mock'
 
 const NOTIF_PREFS_KEY = 'htf_notif_prefs'
-const NOTIF_ITEMS = [
-  { key: 'fault_new',    label: 'Nieuwe storing gemeld' },
-  { key: 'fault_update', label: 'Status storing gewijzigd' },
-  { key: 'pickup',       label: 'Ophaalmoment gepland' },
-  { key: 'chat',         label: 'Nieuw chatbericht' },
-  { key: 'vehicle',      label: 'Voertuig toegewezen' },
-] as const
 
-type PrefKey = typeof NOTIF_ITEMS[number]['key']
+type PrefKey = 'fault_new' | 'fault_update' | 'pickup' | 'chat' | 'vehicle'
 
 const loadPrefs = (): Record<PrefKey, boolean> => {
   try {
@@ -26,6 +19,7 @@ const loadPrefs = (): Record<PrefKey, boolean> => {
 
 export default function Profile() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const toast = useToast()
 
   const [name, setName]     = useState(user?.full_name ?? '')
@@ -37,12 +31,20 @@ export default function Profile() {
 
   const loc = MOCK_MODE ? MOCK_LOC_MAP[user.location_id] : user.location
 
+  const NOTIF_ITEMS: { key: PrefKey; label: string }[] = [
+    { key: 'fault_new',    label: t('notifKey_fault_new') },
+    { key: 'fault_update', label: t('notifKey_fault_update') },
+    { key: 'pickup',       label: t('notifKey_pickup') },
+    { key: 'chat',         label: t('notifKey_chat') },
+    { key: 'vehicle',      label: t('notifKey_vehicle') },
+  ]
+
   const saveProfile = async () => {
     setSaving(true)
     try {
       if (MOCK_MODE) {
         await new Promise((r) => setTimeout(r, 500))
-        toast('Profiel opgeslagen (demo).')
+        toast(t('toastProfileSavedDemo'))
         setSaving(false)
         return
       }
@@ -51,41 +53,41 @@ export default function Profile() {
         await supabase!.auth.updateUser({ password: newPw })
       }
       setNewPw('')
-      toast('Profiel opgeslagen.')
+      toast(t('toastProfileSaved'))
     } catch {
-      toast('Opslaan mislukt.', 'error')
+      toast(t('toastSaveFailed'), 'error')
     }
     setSaving(false)
   }
 
   return (
     <div>
-      <div className="htf-title">Profiel</div>
-      <div className="htf-sub">{roleLabel[user.role]} · {loc?.name}</div>
+      <div className="htf-title">{t('profileTitle')}</div>
+      <div className="htf-sub">{t(`role_${user.role}` as Parameters<typeof t>[0])} · {loc?.name}</div>
 
       <div className="grid-2">
         <div className="htf-card">
-          <div className="htf-sh"><h2>Persoonsgegevens</h2><div className="htf-rule" /></div>
+          <div className="htf-sh"><h2>{t('personalData')}</h2><div className="htf-rule" /></div>
 
           <div className="field">
-            <label className="lbl">Volledige naam</label>
+            <label className="lbl">{t('fullName')}</label>
             <input className="inp" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div className="field">
-            <label className="lbl">Rol</label>
-            <input className="inp" value={roleLabel[user.role]} disabled style={{ opacity: 0.6 }} />
+            <label className="lbl">{t('roleLabel')}</label>
+            <input className="inp" value={t(`role_${user.role}` as Parameters<typeof t>[0])} disabled style={{ opacity: 0.6 }} />
           </div>
 
           <div className="field">
-            <label className="lbl">Locatie</label>
+            <label className="lbl">{t('locationLabel')}</label>
             <input className="inp" value={loc?.name ?? user.location_id} disabled style={{ opacity: 0.6 }} />
           </div>
 
           {!MOCK_MODE && (
             <div className="field">
-              <label className="lbl">Nieuw wachtwoord <span style={{ color: 'var(--muted)' }}>(optioneel · min. 6 tekens)</span></label>
-              <input className="inp" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Laat leeg om niet te wijzigen" />
+              <label className="lbl">{t('newPassword')} <span style={{ color: 'var(--muted)' }}>{t('passwordHint')}</span></label>
+              <input className="inp" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t('passwordPH')} />
             </div>
           )}
 
@@ -95,17 +97,17 @@ export default function Profile() {
             disabled={saving || (!name.trim())}
             style={{ marginTop: 4 }}
           >
-            {saving ? 'Opslaan…' : 'Opslaan'}
+            {saving ? t('saving') : t('save')}
           </button>
           {MOCK_MODE && (
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-              Naam-wijzigingen worden opgeslagen zodra Supabase is verbonden.
+              {t('mockNote')}
             </div>
           )}
         </div>
 
         <div className="htf-card htf-card-gold">
-          <div className="htf-sh"><h2>Notificatie-instellingen</h2><div className="htf-rule" /></div>
+          <div className="htf-sh"><h2>{t('notifSettings')}</h2><div className="htf-rule" /></div>
           {NOTIF_ITEMS.map((item) => (
             <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F5E6CC' }}>
               <span style={{ fontSize: 14 }}>{item.label}</span>
@@ -122,7 +124,7 @@ export default function Profile() {
             </div>
           ))}
           <div style={{ marginTop: 16, fontSize: 12, color: 'var(--muted)', fontFamily: "'Barlow Condensed'", letterSpacing: 1 }}>
-            Instellingen worden lokaal opgeslagen.
+            {t('prefsLocal')}
           </div>
         </div>
       </div>

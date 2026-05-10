@@ -1,4 +1,5 @@
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useToast } from '@/components/Toast'
 import { vehicleTypeLabel } from '@/lib/utils'
 import { useLocations } from '@/hooks/useLocations'
@@ -10,6 +11,7 @@ const VEHICLE_TYPES: VehicleType[] = ['ebike', 'scooter', 'car', 'bus']
 
 export default function AdminReserves() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const toast = useToast()
   const { locations: locs, loading: locsLoading } = useLocations({ excludeHub: true })
   const { vehicles } = useVehicles()
@@ -27,27 +29,27 @@ export default function AdminReserves() {
   }
 
   const saveAll = () => {
-    toast('Reserve targets opgeslagen.')
+    toast(t('toastReservesSaved'))
   }
 
-  if (locsLoading || resLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Laden…</div>
+  if (locsLoading || resLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>{t('loading')}</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div className="htf-title">Reserve targets</div>
-          <div className="htf-sub">Minimum voertuigen per locatie · Supervisor only</div>
+          <div className="htf-title">{t('reserveTargets')}</div>
+          <div className="htf-sub">{t('reserveSub')}</div>
         </div>
-        <button className="btn btn-green" onClick={saveAll}>Opslaan</button>
+        <button className="btn btn-green" onClick={saveAll}>{t('save')}</button>
       </div>
 
       <div className="htf-card" style={{ padding: 0 }}>
         <table className="data-table">
           <thead>
             <tr>
-              <th>Locatie</th>
-              {VEHICLE_TYPES.map((t) => <th key={t}>{vehicleTypeLabel[t]}</th>)}
+              <th>{t('colLocation')}</th>
+              {VEHICLE_TYPES.map((vtype) => <th key={vtype}>{vehicleTypeLabel[vtype]}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -70,7 +72,7 @@ export default function AdminReserves() {
                           style={{ width: 60, padding: '4px 8px', border: '1.5px solid var(--bdr)', borderRadius: 3, fontFamily: "'Barlow'", fontSize: 14, background: 'var(--cream)' }}
                         />
                         <span style={{ fontSize: 12, color: below ? 'var(--red)' : 'var(--green)', fontFamily: "'Barlow Condensed'", letterSpacing: 0.5 }}>
-                          ({actual} huidig{below ? ' ⚠' : ' ✓'})
+                          ({actual} {t('actualSuffix')}{below ? ' ⚠' : ' ✓'})
                         </span>
                       </div>
                     </td>

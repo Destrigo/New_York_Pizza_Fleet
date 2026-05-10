@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage } from '@/types'
 import { fmtTime } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { MOCK_USERS_MAP } from '@/lib/mock'
 import { MOCK_MODE } from '@/lib/supabase'
 
@@ -14,6 +15,7 @@ interface Props {
 
 export default function ChatPanel({ faultId, messages, readOnly = false, onSend }: Props) {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -33,8 +35,8 @@ export default function ChatPanel({ faultId, messages, readOnly = false, onSend 
   }
 
   const resolveUser = (msg: ChatMessage) => {
-    if (MOCK_MODE) return MOCK_USERS_MAP[msg.sender_id]?.full_name ?? 'Onbekend'
-    return msg.sender?.full_name ?? 'Onbekend'
+    if (MOCK_MODE) return MOCK_USERS_MAP[msg.sender_id]?.full_name ?? t('unknown')
+    return msg.sender?.full_name ?? t('unknown')
   }
 
   return (
@@ -42,7 +44,7 @@ export default function ChatPanel({ faultId, messages, readOnly = false, onSend 
       <div className="chat-msgs">
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, margin: 'auto' }}>
-            Nog geen berichten in dit gesprek.
+            {t('noMessages')}
           </div>
         ) : (
           messages.map((msg) => {
@@ -65,14 +67,14 @@ export default function ChatPanel({ faultId, messages, readOnly = false, onSend 
         <div className="chat-footer">
           <input
             className="chat-inp"
-            placeholder="Stuur een bericht…"
+            placeholder={t('messagePH')}
             value={draft}
             maxLength={1000}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
           />
           <button className="btn btn-red btn-sm" onClick={handleSend} disabled={!draft.trim()}>
-            Stuur
+            {t('sendBtn')}
           </button>
         </div>
       )}
@@ -80,7 +82,7 @@ export default function ChatPanel({ faultId, messages, readOnly = false, onSend 
       {readOnly && (
         <div style={{ padding: '8px 12px', borderTop: '1px solid var(--bdr)', background: 'var(--cream)' }}>
           <div className="policy-banner" style={{ borderRadius: 3 }}>
-            📵 Communicatie verloopt uitsluitend via Hi Tom Fleet. Geen telefonisch contact.
+            {t('chatPolicy')}
           </div>
         </div>
       )}

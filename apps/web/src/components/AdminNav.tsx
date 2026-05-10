@@ -1,15 +1,18 @@
 import { Link, useLocation } from 'react-router-dom'
-
-const ADMIN_LINKS = [
-  { to: '/admin/users',     label: 'Gebruikers' },
-  { to: '/admin/locations', label: 'Locaties' },
-  { to: '/admin/vehicles',  label: 'Voertuigen' },
-  { to: '/admin/reserves',  label: 'Reserve targets' },
-]
+import { useI18n } from '@/context/I18nContext'
 
 export default function AdminNav() {
   const { pathname } = useLocation()
+  const { t } = useI18n()
+
   if (!pathname.startsWith('/admin')) return null
+
+  const ADMIN_LINKS = [
+    { to: '/admin/users',     label: t('adminNavUsers') },
+    { to: '/admin/locations', label: t('tabLocations') },
+    { to: '/admin/vehicles',  label: t('vehicles') },
+    { to: '/admin/reserves',  label: t('reserveTargets') },
+  ]
 
   return (
     <div style={{
