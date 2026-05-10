@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Notification } from '@/types'
 import { supabase, MOCK_MODE } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -13,6 +13,7 @@ export function useNotifications() {
   const { user } = useAuth()
   const [notifs, setNotifs]   = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const channelName = useRef(`notifications-${user?.id ?? 'anon'}-${Math.random().toString(36).slice(2)}`)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -37,7 +38,7 @@ export function useNotifications() {
   useEffect(() => {
     if (!user || MOCK_MODE) return
     const channel = supabase!
-      .channel(`notifications-${user.id}`)
+      .channel(channelName.current)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${user.id}` },
