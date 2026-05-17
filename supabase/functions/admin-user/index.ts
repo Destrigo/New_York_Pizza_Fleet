@@ -34,9 +34,10 @@ Deno.serve(async (req) => {
     }
 
     // Send Supabase invite email; the user row is created by a DB trigger on auth.users
+    const siteUrl = Deno.env.get('SITE_URL')
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { full_name, role: userRole, location_id: location_id || null },
-      redirectTo: Deno.env.get('SITE_URL') + '/login',
+      ...(siteUrl ? { redirectTo: siteUrl + '/login' } : {}),
     })
 
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400 })
