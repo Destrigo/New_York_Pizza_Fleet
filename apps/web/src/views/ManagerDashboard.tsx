@@ -33,8 +33,12 @@ export default function ManagerDashboard() {
   const myRankIdx = byFaults.findIndex((r) => r.location_id === user.location_id)
   const myRank    = myRankIdx >= 0 ? myRankIdx + 1 : null
 
-  const bikes    = myVehicles.filter((v) => v.type === 'ebike').length
-  const scooters = myVehicles.filter((v) => v.type === 'scooter').length
+  const bikes        = myVehicles.filter((v) => v.type === 'ebike').length
+  const bikesOk      = myVehicles.filter((v) => v.type === 'ebike' && v.status === 'ok').length
+  const bikesFault   = myVehicles.filter((v) => v.type === 'ebike' && (v.status === 'fault' || v.status === 'fix')).length
+  const scooters     = myVehicles.filter((v) => v.type === 'scooter').length
+  const scootersOk   = myVehicles.filter((v) => v.type === 'scooter' && v.status === 'ok').length
+  const scootersFault= myVehicles.filter((v) => v.type === 'scooter' && (v.status === 'fault' || v.status === 'fix')).length
 
   const getVehicleIcon = (vehicleId: string) => {
     const v = MOCK_MODE
@@ -66,8 +70,22 @@ export default function ManagerDashboard() {
       {tab === 'dashboard' && (
         <>
           <div className="htf-stats">
-            <div className="htf-stat"><div className="htf-stat-n">{bikes}</div><div className="htf-stat-l">🔴 E-Bikes</div></div>
-            <div className="htf-stat" style={{ borderTopColor: 'var(--green)' }}><div className="htf-stat-n" style={{ color: 'var(--green)' }}>{scooters}</div><div className="htf-stat-l">🔵 Scooters</div></div>
+            <div className="htf-stat">
+              <div className="htf-stat-n">{bikes}</div>
+              <div className="htf-stat-l">🔴 E-Bikes</div>
+              <div style={{ fontSize: 11, fontFamily: "'Barlow Condensed'", letterSpacing: 1, marginTop: 6 }}>
+                <span style={{ color: 'var(--green)' }}>{bikesOk} ok</span>
+                {bikesFault > 0 && <span style={{ color: 'var(--red)', marginLeft: 6 }}>{bikesFault} {t('activeFaults')}</span>}
+              </div>
+            </div>
+            <div className="htf-stat" style={{ borderTopColor: 'var(--green)' }}>
+              <div className="htf-stat-n" style={{ color: 'var(--green)' }}>{scooters}</div>
+              <div className="htf-stat-l">🔵 Scooters</div>
+              <div style={{ fontSize: 11, fontFamily: "'Barlow Condensed'", letterSpacing: 1, marginTop: 6 }}>
+                <span style={{ color: 'var(--green)' }}>{scootersOk} ok</span>
+                {scootersFault > 0 && <span style={{ color: 'var(--red)', marginLeft: 6 }}>{scootersFault} {t('activeFaults')}</span>}
+              </div>
+            </div>
             <div className="htf-stat" style={{ borderTopColor: active.length > 0 ? 'var(--red)' : 'var(--green)' }}>
               <div className="htf-stat-n" style={{ color: active.length > 0 ? 'var(--red)' : 'var(--green)' }}>{active.length}</div>
               <div className="htf-stat-l">{t('activeFaults')}</div>
