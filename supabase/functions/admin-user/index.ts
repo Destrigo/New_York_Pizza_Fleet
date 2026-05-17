@@ -4,6 +4,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -19,9 +24,13 @@ async function getCallerRole(authHeader: string | null): Promise<string | null> 
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   const role = await getCallerRole(req.headers.get('Authorization'))
   if (role !== 'supervisor') {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
   }
 
   const body = await req.json()
@@ -30,7 +39,7 @@ Deno.serve(async (req) => {
   if (action === 'invite') {
     const { email, full_name, role: userRole, location_id } = body
     if (!email || !full_name || !userRole) {
-      return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400, headers: corsHeaders })
     }
 
     // Send Supabase invite email; the user row is created by a DB trigger on auth.users
@@ -40,7 +49,7 @@ Deno.serve(async (req) => {
       ...(siteUrl ? { redirectTo: siteUrl + '/login' } : {}),
     })
 
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400 })
+    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders })
 
     // Insert into public.users immediately (trigger may not run until confirmation)
     await supabase.from('users').upsert({
@@ -51,24 +60,24 @@ Deno.serve(async (req) => {
     }, { onConflict: 'id', ignoreDuplicates: true })
 
     return new Response(JSON.stringify({ ok: true, user_id: data.user.id }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
   if (action === 'deactivate') {
     const { user_id } = body
-    if (!user_id) return new Response(JSON.stringify({ error: 'Missing user_id' }), { status: 400 })
+    if (!user_id) return new Response(JSON.stringify({ error: 'Missing user_id' }), { status: 400, headers: corsHeaders })
 
     // Ban for 100 years (effectively permanent; can be lifted in Supabase dashboard)
     const { error } = await supabase.auth.admin.updateUserById(user_id, {
       ban_duration: '876000h',
     })
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400 })
+    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders })
 
     return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400 })
+  return new Response(JSON.stringify({ error: 'Unknown action' }), { status: 400, headers: corsHeaders })
 })
